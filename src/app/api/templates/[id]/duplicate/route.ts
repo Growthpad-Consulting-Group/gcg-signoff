@@ -7,7 +7,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: source, error: sourceError } = await supabase
     .from("signature_templates")
-    .select("name, description, html, blocks")
+    .select("name, description, html, builder_data")
     .eq("id", id)
     .single();
   if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 404 });
@@ -26,7 +26,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       name: `${source.name} (copy)`,
       description: source.description,
       html: source.html,
-      blocks: source.blocks,
+      builder_data: source.builder_data,
       sort_order,
     })
     .select("*")

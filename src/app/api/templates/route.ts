@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
-import { DEFAULT_TEMPLATE_BLOCKS, blocksToHtml } from "@/features/signatures/lib/blocks";
+import { DEFAULT_TEMPLATE_HTML } from "@/features/signatures/lib/defaultTemplate";
 
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get("query")?.trim();
@@ -40,10 +40,9 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const sort_order = (last?.sort_order ?? -1) + 1;
 
-  const blocks = DEFAULT_TEMPLATE_BLOCKS;
   const { data: template, error } = await supabase
     .from("signature_templates")
-    .insert({ name, description, html: html || blocksToHtml(blocks), blocks, sort_order })
+    .insert({ name, description, html: html || DEFAULT_TEMPLATE_HTML, sort_order })
     .select("*")
     .single();
 

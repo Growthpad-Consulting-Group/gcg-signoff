@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import juice from "juice";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,9 +15,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
   const supabase = createServerSupabaseClient();
 
+  // The editor sends raw html + a separate <style> block from GrapesJS; email clients need
+  // everything inlined, so fold css into html here rather than storing/sending a <style> tag.
+  const { css, ...rest } = body;
+  const update = css ? { ...rest, html: juice.inlineContent(rest.html, css) } : rest;
+
   const { data: template, error } = await supabase
     .from("signature_templates")
-    .update({ ...body, updated_at: new Date().toISOString() })
+    .update({ ...update, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("*")
     .single();

@@ -69,5 +69,3 @@ This handles every piece of outgoing company mail. Don't skip straight to step 4
   beyond its own logs. Fine for initial rollout; worth wiring up before full production traffic.
 - **Attachments larger than fit in memory** — `mailparser` buffers the whole message; revisit
   if large attachments turn out to be common.
-- **Deploy-status sync** — nothing yet flips `signature_assignments.deploy_status` in the app
-  based on gateway activity. Next piece to build once this is confirmed working end-to-end.

@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { fetchSignatureHtml } from "./renderClient.js";
 import { appendToHtml, appendToText } from "./injectSignature.js";
 import { relayMessage } from "./relay.js";
+import { reportDeployStatus } from "./deployStatusClient.js";
 
 function isAllowed(remoteAddress: string): boolean {
   if (config.allowedClientIps.length === 0) {
@@ -43,23 +44,31 @@ const server = new SMTPServer({
         if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
         if (parsed.references) headers["References"] = ([] as string[]).concat(parsed.references as any).join(" ");
 
-        await relayMessage({
-          envelopeFrom,
-          envelopeTo,
-          from: parsed.from?.text,
-          to: parsed.to && "text" in parsed.to ? parsed.to.text : undefined,
-          cc: parsed.cc && "text" in parsed.cc ? parsed.cc.text : undefined,
-          subject: parsed.subject,
-          html: html || undefined,
-          text,
-          headers,
-          attachments: parsed.attachments.map((a) => ({
-            filename: a.filename,
-            content: a.content,
-            contentType: a.contentType,
-            cid: a.cid,
-          })),
-        });
+        try {
+          await relayMessage({
+            envelopeFrom,
+            envelopeTo,
+            from: parsed.from?.text,
+            to: parsed.to && "text" in parsed.to ? parsed.to.text : undefined,
+            cc: parsed.cc && "text" in parsed.cc ? parsed.cc.text : undefined,
+            subject: parsed.subject,
+            html: html || undefined,
+            text,
+            headers,
+            attachments: parsed.attachments.map((a) => ({
+              filename: a.filename,
+              content: a.content,
+              contentType: a.contentType,
+              cid: a.cid,
+            })),
+          });
+        } catch (relayErr) {
+          // Only staff with an assignment have a deploy_status row worth updating.
+          if (signatureHtml) await reportDeployStatus(envelopeFrom, "error", (relayErr as Error).message);
+          throw relayErr;
+        }
+
+        if (signatureHtml) await reportDeployStatus(envelopeFrom, "deployed");
 
         console.log(`[gateway] relayed ${envelopeFrom} -> ${envelopeTo.join(", ")}${signatureHtml ? " (signed)" : " (no signature — sender not found)"}`);
         callback();

@@ -119,11 +119,17 @@ See `supabase/migrations/0001_init.sql` for the full schema, and
   insertion, table-based starter template.
 - Staff management (`/staff`) — add staff, assign a template per person.
 - Domain management (`/domains`) — register a domain and its mail platform.
-- `GET /api/render` — the render endpoint the gateway will call, secured by
+- `GET /api/render` — the render endpoint the gateway calls per message, secured by
   `RENDER_API_SECRET`.
+- `POST /api/deploy-status` — the gateway reports back here after each relay, so
+  `signature_assignments.deploy_status` reflects whether a message actually went out signed.
+- `gateway/` — the Outbound Gateway service itself: receives mail, calls `/api/render`, injects
+  the signature, relays via Google's SMTP Relay service, and reports status back. Verified
+  end-to-end locally (dry-run mode); not yet wired into real Workspace routing — see
+  `gateway/README.md` for the production rollout sequence.
 
 **Next (not yet built):**
-- The actual Outbound Gateway service that calls `/api/render` and stamps outgoing mail.
-- SPF/DKIM setup for that gateway on growthpad.co.ke.
-- A deploy/sync flow that flips `signature_assignments.deploy_status` once the gateway confirms
-  a staff member's signature is live.
+- Actually deploying the gateway and pointing Workspace's Outbound Gateway setting at it —
+  needs Google Admin console access (`gateway/README.md` has the exact steps and ordering).
+- Surfacing `deploy_status`/`deploy_error` in the `/staff` UI beyond the existing pill (e.g. a
+  "why did this fail" detail view) once real deploy errors start happening.

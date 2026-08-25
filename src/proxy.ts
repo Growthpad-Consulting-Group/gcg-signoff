@@ -9,9 +9,10 @@ export async function proxy(req: NextRequest) {
   if (
     PUBLIC_PATHS.includes(pathname) ||
     pathname.startsWith("/api/auth") ||
-    // Hit by the outbound mail gateway at send time, not a logged-in browser — protects itself
-    // with its own RENDER_API_SECRET check instead of a session cookie.
+    // Hit by the outbound mail gateway, not a logged-in browser — both protect themselves
+    // with their own RENDER_API_SECRET check instead of a session cookie.
     pathname.startsWith("/api/render") ||
+    pathname.startsWith("/api/deploy-status") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
@@ -25,6 +25,10 @@ export default function TemplateEditorPage() {
   const [html, setHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const loadedRef = useRef(false);
+  const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -39,23 +43,49 @@ export default function TemplateEditorPage() {
       setDescription(template.description || "");
       setHtml(template.html);
       setLoading(false);
+      // Let the autosave effect settle before treating further changes as user edits.
+      setTimeout(() => {
+        loadedRef.current = true;
+      }, 0);
     })();
   }, [id, router]);
 
-  const save = async () => {
-    setSaving(true);
+  const save = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setSaving(true);
+    else setAutosaveStatus("saving");
+
     const res = await fetch(`/api/templates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, description, html }),
     });
-    setSaving(false);
+
+    if (!silent) setSaving(false);
+
     if (!res.ok) {
-      toast.error("Failed to save template");
+      if (!silent) toast.error("Failed to save template");
+      else setAutosaveStatus("idle");
       return;
     }
-    toast.success("Template saved. Assigned staff will re-deploy on next sync.");
+
+    if (!silent) {
+      toast.success("Template saved. Assigned staff will re-deploy on next sync.");
+    } else {
+      setAutosaveStatus("saved");
+    }
   };
+
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    if (autosaveTimeout.current) clearTimeout(autosaveTimeout.current);
+    autosaveTimeout.current = setTimeout(() => {
+      save({ silent: true });
+    }, 1500);
+    return () => {
+      if (autosaveTimeout.current) clearTimeout(autosaveTimeout.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, description, html]);
 
   const deleteTemplate = async () => {
     if (!confirm(`Delete "${name}"? Staff assigned to it will need a new template.`)) return;
@@ -67,7 +97,25 @@ export default function TemplateEditorPage() {
     router.push("/templates");
   };
 
-  const insertTag = (tag: string) => setHtml((h) => `${h}{{${tag}}}`);
+  const insertTag = (tag: string) => {
+    const textarea = textareaRef.current;
+    const insertion = `{{${tag}}}`;
+
+    if (!textarea) {
+      setHtml((h) => `${h}${insertion}`);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    setHtml((h) => h.slice(0, start) + insertion + h.slice(end));
+
+    requestAnimationFrame(() => {
+      const caret = start + insertion.length;
+      textarea.focus();
+      textarea.setSelectionRange(caret, caret);
+    });
+  };
 
   if (loading) return null;
 
@@ -116,11 +164,29 @@ export default function TemplateEditorPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
-          <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-text-hi">
-            <Icon icon="solar:code-square-broken" className="h-4 w-4" />
-            HTML source
+          <div className="mb-1 flex items-center justify-between text-sm font-medium text-text-hi">
+            <span className="flex items-center gap-1.5">
+              <Icon icon="solar:code-square-broken" className="h-4 w-4" />
+              HTML source
+            </span>
+            {autosaveStatus !== "idle" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
+                {autosaveStatus === "saving" ? (
+                  <>
+                    <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="solar:check-circle-broken" className="h-3.5 w-3.5" />
+                    Saved
+                  </>
+                )}
+              </span>
+            )}
           </div>
           <textarea
+            ref={textareaRef}
             value={html}
             onChange={(e) => setHtml(e.target.value)}
             spellCheck={false}

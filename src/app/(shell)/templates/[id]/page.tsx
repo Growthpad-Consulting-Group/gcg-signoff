@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
-import { MERGE_TAGS, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
+import { renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
+import { SignatureBlock, blocksToHtml, createBlock } from "@/features/signatures/lib/blocks";
+import BlockList from "@/features/signatures/ui/blocks/BlockList";
 
 const PREVIEW_STAFF = {
   full_name: "Jane Wanjiru",
@@ -22,13 +24,14 @@ export default function TemplateEditorPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [html, setHtml] = useState("");
+  const [blocks, setBlocks] = useState<SignatureBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const html = useMemo(() => blocksToHtml(blocks), [blocks]);
 
   useEffect(() => {
     (async () => {
@@ -41,7 +44,7 @@ export default function TemplateEditorPage() {
       const { template } = await res.json();
       setName(template.name);
       setDescription(template.description || "");
-      setHtml(template.html);
+      setBlocks(template.blocks && template.blocks.length > 0 ? template.blocks : [{ ...createBlock("html"), html: template.html }]);
       setLoading(false);
       // Let the autosave effect settle before treating further changes as user edits.
       setTimeout(() => {
@@ -57,7 +60,7 @@ export default function TemplateEditorPage() {
     const res = await fetch(`/api/templates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, html }),
+      body: JSON.stringify({ name, description, blocks, html }),
     });
 
     if (!silent) setSaving(false);
@@ -85,7 +88,7 @@ export default function TemplateEditorPage() {
       if (autosaveTimeout.current) clearTimeout(autosaveTimeout.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, description, html]);
+  }, [name, description, blocks]);
 
   const deleteTemplate = async () => {
     if (!confirm(`Delete "${name}"? Staff assigned to it will need a new template.`)) return;
@@ -97,33 +100,13 @@ export default function TemplateEditorPage() {
     router.push("/templates");
   };
 
-  const insertTag = (tag: string) => {
-    const textarea = textareaRef.current;
-    const insertion = `{{${tag}}}`;
-
-    if (!textarea) {
-      setHtml((h) => `${h}${insertion}`);
-      return;
-    }
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    setHtml((h) => h.slice(0, start) + insertion + h.slice(end));
-
-    requestAnimationFrame(() => {
-      const caret = start + insertion.length;
-      textarea.focus();
-      textarea.setSelectionRange(caret, caret);
-    });
-  };
-
   if (loading) return null;
 
   return (
     <div>
       <PageHeader
         title={name || "Untitled template"}
-        description="Editing signature HTML — merge tags render with each staff member's own details."
+        description="Drag, add, and configure blocks — merge tags render with each staff member's own details."
         icon="solar:pen-new-square-broken"
         actions={[{ label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: deleteTemplate, className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" }]}
         saveAction={{ onSave: save, loading: saving, label: "Save template" }}
@@ -149,25 +132,12 @@ export default function TemplateEditorPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-text-lo">Insert merge tag:</span>
-        {MERGE_TAGS.map((t) => (
-          <button
-            key={t.tag}
-            onClick={() => insertTag(t.tag)}
-            className="rounded-full border border-app-border bg-surface px-2.5 py-1 text-xs font-medium text-text-hi hover:bg-surface-2"
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div>
           <div className="mb-1 flex items-center justify-between text-sm font-medium text-text-hi">
             <span className="flex items-center gap-1.5">
-              <Icon icon="solar:code-square-broken" className="h-4 w-4" />
-              HTML source
+              <Icon icon="solar:widget-broken" className="h-4 w-4" />
+              Blocks
             </span>
             {autosaveStatus !== "idle" && (
               <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
@@ -185,15 +155,11 @@ export default function TemplateEditorPage() {
               </span>
             )}
           </div>
-          <textarea
-            ref={textareaRef}
-            value={html}
-            onChange={(e) => setHtml(e.target.value)}
-            spellCheck={false}
-            className="h-[480px] w-full rounded-lg border border-app-border bg-surface-2 p-3 font-mono text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          <div className="max-h-[540px] overflow-y-auto rounded-lg border border-app-border bg-surface-2 p-3">
+            <BlockList blocks={blocks} onChange={setBlocks} />
+          </div>
           <p className="mt-1 text-xs text-text-lo">
-            Use table-based, inlined-style HTML — Outlook and most mobile clients ignore flexbox/grid and external CSS.
+            Drag blocks to reorder. Use the Advanced HTML block for anything the block library doesn&apos;t cover yet.
           </p>
         </div>
         <div>
@@ -201,7 +167,7 @@ export default function TemplateEditorPage() {
             <Icon icon="solar:eye-broken" className="h-4 w-4" />
             Live preview
           </div>
-          <div className="h-[480px] overflow-auto rounded-lg border border-app-border bg-white p-4 text-black">
+          <div className="h-[540px] overflow-auto rounded-lg border border-app-border bg-white p-4 text-black">
             <div dangerouslySetInnerHTML={{ __html: renderSignatureHtml(html, PREVIEW_STAFF) }} />
           </div>
           <p className="mt-1 text-xs text-text-lo">Rendered with sample data — actual signatures pull each person&apos;s real details.</p>

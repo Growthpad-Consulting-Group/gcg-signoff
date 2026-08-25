@@ -1,0 +1,29 @@
+# dependencies
+/node_modules
+/mcp/node_modules
+/mcp/dist
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# env
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# supabase
+.supabase/
+
+#history
+.historysupabase/.temp/

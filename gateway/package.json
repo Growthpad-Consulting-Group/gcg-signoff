@@ -1,0 +1,27 @@
+{
+  "name": "signoff-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Outbound mail gateway that stamps Signoff signatures onto Google Workspace mail before delivery.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test:send": "tsx scripts/send-test-mail.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mailparser": "^3.9.16",
+    "nodemailer": "^6.10.0",
+    "smtp-server": "^3.19.3"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.4.5",
+    "@types/node": "^22.0.0",
+    "@types/nodemailer": "^6.4.19",
+    "@types/smtp-server": "^3.5.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.0"
+  }
+}

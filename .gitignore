@@ -2,6 +2,8 @@
 /node_modules
 /mcp/node_modules
 /mcp/dist
+/gateway/node_modules
+/gateway/dist
 
 # next.js
 /.next/

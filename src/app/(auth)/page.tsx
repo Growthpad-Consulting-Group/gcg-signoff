@@ -94,7 +94,7 @@ export default function LoginPage() {
               src="/assets/images/logo-tagline-orange.svg"
               alt="Growthpad Consulting Group Logo"
               width={300}
-              height={0}
+              height={55}
               className="animate-fade-in"
             />
           </div>
@@ -225,7 +225,7 @@ export default function LoginPage() {
               src="/assets/images/logo.svg"
               alt="GCG"
               width={200}
-              height={0}
+              height={76}
             />
           </div>
 

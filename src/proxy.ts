@@ -16,6 +16,7 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||
+    pathname.startsWith("/assets") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js"
   ) {

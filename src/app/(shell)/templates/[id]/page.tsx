@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
+import { lintSignatureHtml } from "@/features/signatures/lib/lintSignatureHtml";
 import GrapesEditor, { GrapesEditorHandle } from "@/features/signatures/ui/GrapesEditor";
+import VersionHistoryModal from "@/features/signatures/ui/VersionHistoryModal";
 
 const PREVIEW_STAFF: MergeTagSource = {
   full_name: "Jane Wanjiru",
@@ -47,6 +49,10 @@ export default function TemplateEditorPage() {
   const [testEmail, setTestEmail] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [previewDark, setPreviewDark] = useState(false);
+  const [previewMobile, setPreviewMobile] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<GrapesEditorHandle>(null);
@@ -76,6 +82,20 @@ export default function TemplateEditorPage() {
       }, 0);
     })();
   }, [id, router]);
+
+  // After restoring a version, re-fetch the template and force the GrapesJS canvas to
+  // re-initialize with the restored content (it only reads initial* props on mount).
+  const reloadAfterRestore = async () => {
+    const res = await fetch(`/api/templates/${id}`);
+    if (!res.ok) return;
+    const { template } = await res.json();
+    setInitialHtml(template.html || "");
+    setInitialProjectData(template.builder_data || undefined);
+    setPreviewHtml(template.html || "");
+    setEditorKey((k) => k + 1);
+  };
+
+  const lintFindings = useMemo(() => lintSignatureHtml(previewHtml), [previewHtml]);
 
   const previewData: MergeTagSource = previewAsId
     ? staffOptions.find((s) => s.id === previewAsId) || PREVIEW_STAFF
@@ -165,7 +185,10 @@ export default function TemplateEditorPage() {
         title={name || "Untitled template"}
         description="Drag, drop, and edit visually — merge tags render with each staff member's own details."
         icon="solar:pen-new-square-broken"
-        actions={[{ label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: () => setShowDeleteConfirm(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" }]}
+        actions={[
+          { label: "History", icon: "solar:history-broken", onClick: () => setShowHistory(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-text-hi hover:bg-surface-2 transition-colors" },
+          { label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: () => setShowDeleteConfirm(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" },
+        ]}
         saveAction={{ onSave: save, loading: saving, label: "Save template" }}
       />
 
@@ -232,6 +255,7 @@ export default function TemplateEditorPage() {
       <div className={activeTab === "edit" ? "" : "hidden"}>
         <div className="overflow-hidden rounded-lg border border-app-border">
           <GrapesEditor
+            key={editorKey}
             ref={editorRef}
             initialHtml={initialHtml}
             initialProjectData={initialProjectData}
@@ -283,8 +307,47 @@ export default function TemplateEditorPage() {
           </div>
         </div>
 
-        <div className="h-[540px] overflow-auto rounded-lg border border-app-border bg-white p-4 text-black">
-          <div dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
+        <div className="mb-3 flex items-center gap-2">
+          <button
+            onClick={() => setPreviewDark((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              previewDark ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
+            }`}
+          >
+            <Icon icon="solar:moon-broken" className="h-3.5 w-3.5" />
+            Dark background
+          </button>
+          <button
+            onClick={() => setPreviewMobile((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              previewMobile ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
+            }`}
+          >
+            <Icon icon="solar:smartphone-broken" className="h-3.5 w-3.5" />
+            Mobile width
+          </button>
+        </div>
+
+        <div className={`rounded-lg border p-3 text-sm ${lintFindings.length === 0 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/10" : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10"} mb-3`}>
+          {lintFindings.length === 0 ? (
+            <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              <Icon icon="solar:check-circle-broken" className="h-4 w-4 shrink-0" />
+              No compatibility or accessibility issues found.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {lintFindings.map((f, i) => (
+                <li key={i} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                  <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0" />
+                  {f.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className={`mx-auto h-[540px] overflow-auto rounded-lg border border-app-border p-4 transition-all ${previewDark ? "bg-gray-900" : "bg-white"} ${previewMobile ? "max-w-[375px]" : ""}`}>
+          <div className={previewDark ? "text-white" : "text-black"} dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
         </div>
         <p className="mt-1 text-xs text-text-lo">
           {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."} Send a test to see how it looks in an actual inbox.
@@ -298,6 +361,13 @@ export default function TemplateEditorPage() {
         confirmLabel="Delete"
         onConfirm={deleteTemplate}
         onClose={() => setShowDeleteConfirm(false)}
+      />
+
+      <VersionHistoryModal
+        templateId={id}
+        isOpen={showHistory}
+        onClose={() => setShowHistory(false)}
+        onRestored={reloadAfterRestore}
       />
     </div>
   );

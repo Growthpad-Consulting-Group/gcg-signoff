@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
@@ -60,6 +61,14 @@ function assignmentOf(staff: Staff): Assignment | null {
 }
 
 export default function StaffPage() {
+  return (
+    <Suspense fallback={null}>
+      <StaffPageInner />
+    </Suspense>
+  );
+}
+
+function StaffPageInner() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -69,6 +78,8 @@ export default function StaffPage() {
   const [bulkTemplateId, setBulkTemplateId] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [form, setForm] = useState({
     domain_id: "",
@@ -96,6 +107,14 @@ export default function StaffPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      router.replace("/staff");
+      setShowAdd(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const domainById = useMemo(() => new Map(domains.map((d) => [d.id, d])), [domains]);
   const selectedDomain = domains.find((d) => d.id === form.domain_id);

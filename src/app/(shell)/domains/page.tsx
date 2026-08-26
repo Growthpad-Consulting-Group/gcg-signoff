@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
@@ -60,6 +61,14 @@ function toEditForm(domain: Domain): EditForm {
 }
 
 export default function DomainsPage() {
+  return (
+    <Suspense fallback={null}>
+      <DomainsPageInner />
+    </Suspense>
+  );
+}
+
+function DomainsPageInner() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [staffCounts, setStaffCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -70,6 +79,8 @@ export default function DomainsPage() {
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Domain | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const load = async () => {
     setLoading(true);
@@ -82,6 +93,14 @@ export default function DomainsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      router.replace("/domains");
+      setShowAdd(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const addDomain = async () => {
     if (!name.trim()) return;

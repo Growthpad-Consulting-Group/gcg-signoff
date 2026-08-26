@@ -35,7 +35,7 @@ export default function RecentActivity() {
   if (notifications === null) return null;
 
   if (notifications.length === 0) {
-    return <p className="text-sm text-text-lo">No recent activity yet — deploy failures and template saves will show up here.</p>;
+    return <p className="text-sm text-text-lo">No recent activity yet - deploy failures and template saves will show up here.</p>;
   }
 
   return (

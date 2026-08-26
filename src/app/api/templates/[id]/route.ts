@@ -22,6 +22,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { css, silent, ...rest } = body;
   const update = css ? { ...rest, html: juice.inlineContent(rest.html, css) } : rest;
 
+  // On an explicit Save (not an autosave tick), snapshot what's about to be overwritten so it
+  // can be restored later.
+  if (!silent) {
+    const { data: previous } = await supabase
+      .from("signature_templates")
+      .select("name, html, blocks, builder_data")
+      .eq("id", id)
+      .single();
+    if (previous) {
+      await supabase.from("signature_template_versions").insert({ template_id: id, ...previous });
+    }
+  }
+
   const { data: template, error } = await supabase
     .from("signature_templates")
     .update({ ...update, updated_at: new Date().toISOString() })

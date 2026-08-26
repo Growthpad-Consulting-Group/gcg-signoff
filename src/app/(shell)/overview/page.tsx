@@ -63,6 +63,30 @@ export default function OverviewPage() {
     <div>
       <PageHeader title="Dashboard" description="Signature coverage across your team." icon="solar:widget-2-broken" />
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href="/templates?new=1"
+          className="inline-flex items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
+        >
+          <Icon icon="solar:add-circle-broken" className="h-4 w-4 text-brand-500" />
+          New template
+        </Link>
+        <Link
+          href="/staff?new=1"
+          className="inline-flex items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
+        >
+          <Icon icon="solar:user-plus-broken" className="h-4 w-4 text-brand-500" />
+          Add staff
+        </Link>
+        <Link
+          href="/domains?new=1"
+          className="inline-flex items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
+        >
+          <Icon icon="solar:global-broken" className="h-4 w-4 text-brand-500" />
+          Add domain
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {cards.map((card) => (
           <Link

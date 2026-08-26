@@ -50,6 +50,7 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
         fromElement: false,
         height: "600px",
         storageManager: false,
+        assetManager: { upload: "/api/uploads", autoAdd: true },
         plugins: [presetNewsletter],
         ...(initialProjectData ? { projectData: initialProjectData } : { components: initialHtml }),
       });

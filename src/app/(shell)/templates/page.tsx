@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -137,6 +137,14 @@ function TemplateCard({
 }
 
 export default function TemplatesPage() {
+  return (
+    <Suspense fallback={null}>
+      <TemplatesPageInner />
+    </Suspense>
+  );
+}
+
+function TemplatesPageInner() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -144,6 +152,7 @@ export default function TemplatesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("manual");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
@@ -173,6 +182,16 @@ export default function TemplatesPage() {
     const { template } = await res.json();
     router.push(`/templates/${template.id}`);
   };
+
+  // Dashboard "New template" quick action deep-links here with ?new=1 instead of a modal, since
+  // this page creates immediately and navigates rather than showing an Add form.
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      router.replace("/templates");
+      createTemplate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const duplicateTemplate = async (id: string) => {
     const res = await fetch(`/api/templates/${id}/duplicate`, { method: "POST" });

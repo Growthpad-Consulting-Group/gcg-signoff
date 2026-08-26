@@ -2,7 +2,7 @@
 // (a registered SW with a fetch handler). Deliberately network-first with no
 // long-lived caching of API responses — this app's data changes too often for
 // a stale-while-revalidate cache to be safe.
-const CACHE_NAME = "gcg-scraper-shell-v1";
+const CACHE_NAME = "signoff-shell-v1";
 const SHELL_ASSETS = ["/manifest.webmanifest", "/favicon.png", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

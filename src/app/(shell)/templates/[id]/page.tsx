@@ -52,6 +52,7 @@ export default function TemplateEditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [previewDark, setPreviewDark] = useState(false);
   const [previewMobile, setPreviewMobile] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -223,46 +224,63 @@ export default function TemplateEditorPage() {
           <Icon icon="solar:widget-broken" className="h-4 w-4" />
           Editor
         </span>
-        {autosaveStatus !== "idle" && (
-          <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
-            {autosaveStatus === "saving" ? (
-              <>
-                <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              <>
-                <Icon icon="solar:check-circle-broken" className="h-3.5 w-3.5" />
-                Saved
-              </>
-            )}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {autosaveStatus !== "idle" && (
+            <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
+              {autosaveStatus === "saving" ? (
+                <>
+                  <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <Icon icon="solar:check-circle-broken" className="h-3.5 w-3.5" />
+                  Saved
+                </>
+              )}
+            </span>
+          )}
+          <button
+            onClick={() => setShowPreview(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
+          >
+            <Icon icon="solar:eye-broken" className="h-4 w-4" />
+            Preview
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <div className="overflow-hidden rounded-lg border border-app-border">
-            <GrapesEditor
-              key={editorKey}
-              ref={editorRef}
-              initialHtml={initialHtml}
-              initialProjectData={initialProjectData}
-              onChange={(html) => {
-                setPreviewHtml(html);
-                scheduleAutosave();
-              }}
-            />
-          </div>
-          <p className="mt-1 text-xs text-text-lo">
-            Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
-          </p>
-        </div>
+      <div className="overflow-hidden rounded-lg border border-app-border">
+        <GrapesEditor
+          key={editorKey}
+          ref={editorRef}
+          initialHtml={initialHtml}
+          initialProjectData={initialProjectData}
+          onChange={(html) => {
+            setPreviewHtml(html);
+            scheduleAutosave();
+          }}
+        />
+      </div>
+      <p className="mt-1 text-xs text-text-lo">
+        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
+      </p>
 
-        <div className="flex flex-col lg:col-span-2">
-          <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-text-hi">
-            <Icon icon="solar:eye-broken" className="h-4 w-4" />
-            Live preview
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowPreview(false)} />
+          <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-app-border bg-bg p-4 shadow-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-sm font-medium text-text-hi">
+              <Icon icon="solar:eye-broken" className="h-4 w-4" />
+              Live preview
+            </div>
+            <button
+              onClick={() => setShowPreview(false)}
+              className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+            >
+              <Icon icon="solar:close-circle-broken" className="h-5 w-5" />
+            </button>
           </div>
 
           <select
@@ -344,8 +362,9 @@ export default function TemplateEditorPage() {
               Send test
             </button>
           </div>
+          </div>
         </div>
-      </div>
+      )}
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

@@ -3,9 +3,21 @@ import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
 
 export async function GET() {
   const supabase = createServerSupabaseClient();
-  const { data: domains, error } = await supabase.from("domains").select("*").order("created_at", { ascending: false });
+
+  const [{ data: domains, error }, { data: staff, error: staffError }] = await Promise.all([
+    supabase.from("domains").select("*").order("created_at", { ascending: false }),
+    supabase.from("staff").select("domain_id"),
+  ]);
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ domains });
+  if (staffError) return NextResponse.json({ error: staffError.message }, { status: 500 });
+
+  const staffCounts: Record<string, number> = {};
+  for (const { domain_id } of staff || []) {
+    staffCounts[domain_id] = (staffCounts[domain_id] || 0) + 1;
+  }
+
+  return NextResponse.json({ domains, staffCounts });
 }
 
 export async function POST(req: NextRequest) {

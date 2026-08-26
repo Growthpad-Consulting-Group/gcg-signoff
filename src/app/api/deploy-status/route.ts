@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
+import { notifyAdmins } from "@/shared/lib/notify";
 
 /**
  * Called by the gateway (see gateway/src/index.ts) right after it relays a message, so
@@ -38,5 +39,10 @@ export async function POST(req: NextRequest) {
     .eq("staff_id", staff.id);
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  if (status === "error") {
+    await notifyAdmins(`Signature deploy failed for ${email}: ${error ?? "Unknown error"}`);
+  }
+
   return NextResponse.json({ ok: true });
 }

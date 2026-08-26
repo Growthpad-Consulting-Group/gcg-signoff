@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import juice from "juice";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
+import { notifyAdmins } from "@/shared/lib/notify";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,7 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // The editor sends raw html + a separate <style> block from GrapesJS; email clients need
   // everything inlined, so fold css into html here rather than storing/sending a <style> tag.
-  const { css, ...rest } = body;
+  // `silent` (autosave ticks) is a client-only flag, not a column — strip it before writing.
+  const { css, silent, ...rest } = body;
   const update = css ? { ...rest, html: juice.inlineContent(rest.html, css) } : rest;
 
   const { data: template, error } = await supabase
@@ -30,10 +32,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Any staff whose signature comes from this template now needs to be re-deployed.
-  await supabase
+  const { data: affected } = await supabase
     .from("signature_assignments")
     .update({ deploy_status: "pending" })
-    .eq("template_id", id);
+    .eq("template_id", id)
+    .select("id");
+
+  // Only notify on an explicit Save, not every autosave tick while the admin is still typing.
+  if (!silent && affected && affected.length > 0) {
+    await notifyAdmins(`Template "${template.name}" updated — ${affected.length} staff will redeploy`);
+  }
 
   return NextResponse.json({ template });
 }

@@ -5,10 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
-import { renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
+import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import GrapesEditor, { GrapesEditorHandle } from "@/features/signatures/ui/GrapesEditor";
 
-const PREVIEW_STAFF = {
+const PREVIEW_STAFF: MergeTagSource = {
   full_name: "Jane Wanjiru",
   email: "jane.wanjiru@growthpad.co.ke",
   role_title: "Marketing Manager",
@@ -17,6 +17,17 @@ const PREVIEW_STAFF = {
   mobile: "+254 711 000 000",
   photo_url: "https://placehold.co/72x72/f05d23/ffffff?text=JW",
 };
+
+interface StaffOption {
+  id: string;
+  full_name: string;
+  email: string;
+  role_title: string | null;
+  department: string | null;
+  phone: string | null;
+  mobile: string | null;
+  photo_url: string | null;
+}
 
 export default function TemplateEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,24 +40,33 @@ export default function TemplateEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+  const [previewAsId, setPreviewAsId] = useState<string>("");
+  const [testEmail, setTestEmail] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<GrapesEditorHandle>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/templates/${id}`);
-      if (!res.ok) {
+      const [templateRes, staffRes] = await Promise.all([
+        fetch(`/api/templates/${id}`),
+        fetch("/api/staff").then((r) => r.json()).catch(() => ({ staff: [] })),
+      ]);
+      if (!templateRes.ok) {
         toast.error("Template not found");
         router.push("/templates");
         return;
       }
-      const { template } = await res.json();
+      const { template } = await templateRes.json();
       setName(template.name);
       setDescription(template.description || "");
       setInitialHtml(template.html || "");
       setInitialProjectData(template.builder_data || undefined);
       setPreviewHtml(template.html || "");
+      setStaffOptions(staffRes.staff || []);
       setLoading(false);
       // Let the autosave effect settle before treating further changes as user edits.
       setTimeout(() => {
@@ -54,6 +74,10 @@ export default function TemplateEditorPage() {
       }, 0);
     })();
   }, [id, router]);
+
+  const previewData: MergeTagSource = previewAsId
+    ? staffOptions.find((s) => s.id === previewAsId) || PREVIEW_STAFF
+    : PREVIEW_STAFF;
 
   const save = async ({ silent = false }: { silent?: boolean } = {}) => {
     const exported = editorRef.current?.getExport();
@@ -66,6 +90,7 @@ export default function TemplateEditorPage() {
       body: JSON.stringify({
         name,
         description,
+        silent,
         ...(exported ? { html: exported.html, css: exported.css, builder_data: exported.projectData } : {}),
       }),
     });
@@ -111,6 +136,26 @@ export default function TemplateEditorPage() {
     router.push("/templates");
   };
 
+  const sendTestEmail = async () => {
+    if (!testEmail.trim()) {
+      toast.error("Enter an email address to send to");
+      return;
+    }
+    setSendingTest(true);
+    const res = await fetch(`/api/templates/${id}/test-send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: testEmail.trim(), staffId: previewAsId || undefined }),
+    });
+    setSendingTest(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to send test email");
+      return;
+    }
+    toast.success(`Test email sent to ${testEmail.trim()}`);
+  };
+
   if (loading) return null;
 
   return (
@@ -143,11 +188,27 @@ export default function TemplateEditorPage() {
         </div>
       </div>
 
-      <div className="mb-1 flex items-center justify-between text-sm font-medium text-text-hi">
-        <span className="flex items-center gap-1.5">
-          <Icon icon="solar:widget-broken" className="h-4 w-4" />
-          Editor
-        </span>
+      <div className="mb-2 flex items-center justify-between">
+        <div className="inline-flex rounded-lg border border-app-border bg-surface p-1">
+          <button
+            onClick={() => setActiveTab("edit")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === "edit" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+            }`}
+          >
+            <Icon icon="solar:widget-broken" className="h-4 w-4" />
+            Edit
+          </button>
+          <button
+            onClick={() => setActiveTab("preview")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeTab === "preview" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+            }`}
+          >
+            <Icon icon="solar:eye-broken" className="h-4 w-4" />
+            Preview
+          </button>
+        </div>
         {autosaveStatus !== "idle" && (
           <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
             {autosaveStatus === "saving" ? (
@@ -164,30 +225,69 @@ export default function TemplateEditorPage() {
           </span>
         )}
       </div>
-      <div className="overflow-hidden rounded-lg border border-app-border">
-        <GrapesEditor
-          ref={editorRef}
-          initialHtml={initialHtml}
-          initialProjectData={initialProjectData}
-          onChange={(html) => {
-            setPreviewHtml(html);
-            scheduleAutosave();
-          }}
-        />
-      </div>
-      <p className="mb-4 mt-1 text-xs text-text-lo">
-        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
-      </p>
 
-      <div>
-        <div className="mb-1 flex items-center gap-1.5 text-sm font-medium text-text-hi">
-          <Icon icon="solar:eye-broken" className="h-4 w-4" />
-          Live preview
+      {/* Both stay mounted — toggling GrapesJS in and out of the DOM would destroy its editor
+          state, so only visibility switches between tabs. */}
+      <div className={activeTab === "edit" ? "" : "hidden"}>
+        <div className="overflow-hidden rounded-lg border border-app-border">
+          <GrapesEditor
+            ref={editorRef}
+            initialHtml={initialHtml}
+            initialProjectData={initialProjectData}
+            onChange={(html) => {
+              setPreviewHtml(html);
+              scheduleAutosave();
+            }}
+          />
         </div>
-        <div className="h-[400px] overflow-auto rounded-lg border border-app-border bg-white p-4 text-black">
-          <div dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, PREVIEW_STAFF) }} />
+        <p className="mt-1 text-xs text-text-lo">
+          Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
+        </p>
+      </div>
+
+      <div className={activeTab === "preview" ? "" : "hidden"}>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <select
+            value={previewAsId}
+            onChange={(e) => setPreviewAsId(e.target.value)}
+            className="rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Sample data (Jane Wanjiru)</option>
+            {staffOptions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.full_name}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex flex-1 items-center gap-2">
+            <input
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              placeholder="Send a test to..."
+              className="flex-1 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <button
+              onClick={sendTestEmail}
+              disabled={sendingTest}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
+            >
+              {sendingTest ? (
+                <Icon icon="solar:loading-bold" className="h-4 w-4 animate-spin" />
+              ) : (
+                <Icon icon="solar:letter-broken" className="h-4 w-4" />
+              )}
+              Send test
+            </button>
+          </div>
         </div>
-        <p className="mt-1 text-xs text-text-lo">Rendered with sample data — actual signatures pull each person&apos;s real details.</p>
+
+        <div className="h-[540px] overflow-auto rounded-lg border border-app-border bg-white p-4 text-black">
+          <div dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
+        </div>
+        <p className="mt-1 text-xs text-text-lo">
+          {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."} Send a test to see how it looks in an actual inbox.
+        </p>
       </div>
     </div>
   );

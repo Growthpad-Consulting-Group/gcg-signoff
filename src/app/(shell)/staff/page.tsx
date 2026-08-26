@@ -11,6 +11,7 @@ import GenericEmptyState from "@/shared/ui/EmptyState";
 interface Domain {
   id: string;
   name: string;
+  gateway_status: "not_configured" | "pending_dns" | "active" | "error";
 }
 
 interface Template {
@@ -53,6 +54,10 @@ export default function StaffPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTemplateId, setBulkTemplateId] = useState("");
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     domain_id: "",
@@ -80,6 +85,9 @@ export default function StaffPage() {
   useEffect(() => {
     load();
   }, []);
+
+  const domainById = useMemo(() => new Map(domains.map((d) => [d.id, d])), [domains]);
+  const selectedDomain = domains.find((d) => d.id === form.domain_id);
 
   const canSubmit = useMemo(() => form.domain_id && form.email.trim() && form.full_name.trim(), [form]);
 
@@ -113,6 +121,50 @@ export default function StaffPage() {
     load();
   };
 
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => (prev.size === staff.length ? new Set() : new Set(staff.map((s) => s.id))));
+  };
+
+  const applyBulkTemplate = async () => {
+    if (!bulkTemplateId || selectedIds.size === 0) return;
+    setBulkApplying(true);
+    const res = await fetch("/api/staff/bulk-assign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ staff_ids: Array.from(selectedIds), template_id: bulkTemplateId }),
+    });
+    setBulkApplying(false);
+    if (!res.ok) {
+      toast.error("Failed to apply template");
+      return;
+    }
+    toast.success(`Template applied to ${selectedIds.size} staff member${selectedIds.size === 1 ? "" : "s"}`);
+    setSelectedIds(new Set());
+    setBulkTemplateId("");
+    load();
+  };
+
+  const retryDeploy = async (staffId: string) => {
+    setRetryingId(staffId);
+    const res = await fetch(`/api/staff/${staffId}/retry-deploy`, { method: "POST" });
+    setRetryingId(null);
+    if (!res.ok) {
+      toast.error("Failed to retry");
+      return;
+    }
+    toast.success("Marked pending — takes effect on their next outgoing email");
+    load();
+  };
+
   return (
     <div>
       <PageHeader
@@ -140,11 +192,45 @@ export default function StaffPage() {
         />
       )}
 
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-app-border bg-surface-2 px-4 py-2.5">
+          <span className="text-sm font-medium text-text-hi">{selectedIds.size} selected</span>
+          <select
+            value={bulkTemplateId}
+            onChange={(e) => setBulkTemplateId(e.target.value)}
+            className="rounded-lg border border-app-border bg-surface px-2 py-1.5 text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="" disabled>
+              Choose template
+            </option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={applyBulkTemplate}
+            disabled={!bulkTemplateId || bulkApplying}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            {bulkApplying && <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />}
+            Apply to {selectedIds.size}
+          </button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-xs font-medium text-text-lo hover:text-text-hi">
+            Clear
+          </button>
+        </div>
+      )}
+
       {staff.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-app-border bg-surface shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b border-app-border bg-surface-2 text-left text-xs uppercase tracking-wide text-text-lo">
               <tr>
+                <th className="px-4 py-3">
+                  <input type="checkbox" checked={selectedIds.size === staff.length} onChange={toggleSelectAll} className="rounded border-app-border" />
+                </th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
@@ -155,8 +241,18 @@ export default function StaffPage() {
             <tbody>
               {staff.map((person) => {
                 const assignment = assignmentOf(person);
+                const domain = domainById.get(person.domain_id);
+                const domainInactive = domain && domain.gateway_status !== "active";
                 return (
                   <tr key={person.id} className="border-b border-app-border last:border-0">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(person.id)}
+                        onChange={() => toggleSelected(person.id)}
+                        className="rounded border-app-border"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-medium text-text-hi">{person.full_name}</td>
                     <td className="px-4 py-3 text-text-lo">{person.email}</td>
                     <td className="px-4 py-3 text-text-lo">
@@ -180,9 +276,26 @@ export default function StaffPage() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[assignment?.deploy_status ?? "pending"]}`}>
-                        {assignment ? assignment.deploy_status : "unassigned"}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[assignment?.deploy_status ?? "pending"]}`}>
+                          {assignment ? assignment.deploy_status : "unassigned"}
+                        </span>
+                        {domainInactive && (
+                          <span title={`Domain "${domain?.name}" gateway isn't active — signatures won't deploy until it is.`}>
+                            <Icon icon="solar:danger-triangle-broken" className="h-4 w-4 text-amber-500" />
+                          </span>
+                        )}
+                        {assignment?.deploy_status === "error" && (
+                          <button
+                            onClick={() => retryDeploy(person.id)}
+                            disabled={retryingId === person.id}
+                            className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                            title="Marks pending again — takes effect on their next outgoing email"
+                          >
+                            {retryingId === person.id ? "Retrying…" : "Retry"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -210,6 +323,12 @@ export default function StaffPage() {
                 </option>
               ))}
             </select>
+            {selectedDomain && selectedDomain.gateway_status !== "active" && (
+              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                <Icon icon="solar:danger-triangle-broken" className="h-3.5 w-3.5 shrink-0" />
+                This domain&apos;s mail gateway isn&apos;t active yet — signatures won&apos;t deploy until it is.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

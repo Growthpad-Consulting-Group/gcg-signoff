@@ -9,13 +9,15 @@ export async function GET() {
   since.setDate(since.getDate() - (DAYS - 1));
   const sinceDate = since.toISOString().slice(0, 10);
 
-  const [{ data: campaigns, error }, { data: dailyStats, error: statsError }] = await Promise.all([
-    supabase.from("campaigns").select("id, name, active, starts_at, ends_at").order("created_at", { ascending: false }),
+  const [{ data: campaigns, error }, { data: dailyStats, error: statsError }, { data: experiments, error: experimentsError }] = await Promise.all([
+    supabase.from("campaigns").select("id, name, active, starts_at, ends_at, experiment_id, variant_label").order("created_at", { ascending: false }),
     supabase.from("campaign_daily_stats").select("campaign_id, date, impressions, clicks").gte("date", sinceDate).order("date", { ascending: true }),
+    supabase.from("campaign_experiments").select("id, name"),
   ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (statsError) return NextResponse.json({ error: statsError.message }, { status: 500 });
+  if (experimentsError) return NextResponse.json({ error: experimentsError.message }, { status: 500 });
 
   // Per-campaign lifetime totals need the full history, not just the last DAYS window used
   // for the chart — fetch separately rather than reusing the windowed query above.
@@ -58,5 +60,22 @@ export async function GET() {
     series.push({ date: dateStr, impressions: byDate[dateStr]?.impressions || 0, clicks: byDate[dateStr]?.clicks || 0 });
   }
 
-  return NextResponse.json({ totals, series, campaigns: campaignRows });
+  // Group campaigns by experiment for a side-by-side variant comparison, each with its own CTR.
+  const experimentGroups = (experiments || [])
+    .map((exp) => {
+      const variants = campaignRows
+        .filter((c) => c.experiment_id === exp.id)
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          variant_label: c.variant_label,
+          impressions: c.impressions,
+          clicks: c.clicks,
+          ctr: c.impressions > 0 ? c.clicks / c.impressions : 0,
+        }));
+      return { id: exp.id, name: exp.name, variants };
+    })
+    .filter((exp) => exp.variants.length > 0);
+
+  return NextResponse.json({ totals, series, campaigns: campaignRows, experiments: experimentGroups });
 }

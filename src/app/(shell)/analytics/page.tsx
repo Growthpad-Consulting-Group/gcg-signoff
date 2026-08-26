@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react";
 import PageHeader from "@/shared/ui/PageHeader";
 import GenericEmptyState from "@/shared/ui/EmptyState";
+import ExperimentComparison from "@/features/campaigns/ui/ExperimentComparison";
 
 const CampaignTrendChart = dynamic(() => import("@/features/campaigns/ui/CampaignTrendChart"), {
   ssr: false,
@@ -21,10 +22,26 @@ interface CampaignRow {
   clicks: number;
 }
 
+interface ExperimentVariant {
+  id: string;
+  name: string;
+  variant_label: string | null;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+}
+
+interface Experiment {
+  id: string;
+  name: string;
+  variants: ExperimentVariant[];
+}
+
 interface AnalyticsData {
   totals: { impressions: number; clicks: number };
   series: { date: string; impressions: number; clicks: number }[];
   campaigns: CampaignRow[];
+  experiments: Experiment[];
 }
 
 export default function AnalyticsPage() {
@@ -79,6 +96,8 @@ export default function AnalyticsPage() {
             <h2 className="mb-4 font-display text-sm font-semibold text-text-hi">Last 30 days</h2>
             {data ? <CampaignTrendChart series={data.series} /> : <div className="h-64" />}
           </div>
+
+          {data && <ExperimentComparison experiments={data.experiments} />}
 
           <div className="overflow-hidden rounded-2xl border border-app-border bg-surface shadow-sm">
             <table className="w-full text-sm">

@@ -14,6 +14,11 @@ interface Domain {
   name: string;
 }
 
+interface Experiment {
+  id: string;
+  name: string;
+}
+
 interface Campaign {
   id: string;
   name: string;
@@ -24,6 +29,8 @@ interface Campaign {
   active: boolean;
   starts_at: string | null;
   ends_at: string | null;
+  experiment_id: string | null;
+  variant_label: string | null;
 }
 
 interface CampaignForm {
@@ -34,9 +41,23 @@ interface CampaignForm {
   weight: number;
   starts_at: string;
   ends_at: string;
+  experiment_id: string;
+  variant_label: string;
 }
 
-const EMPTY_FORM: CampaignForm = { name: "", image_url: "", link_url: "", domain_id: "", weight: 1, starts_at: "", ends_at: "" };
+const EMPTY_FORM: CampaignForm = {
+  name: "",
+  image_url: "",
+  link_url: "",
+  domain_id: "",
+  weight: 1,
+  starts_at: "",
+  ends_at: "",
+  experiment_id: "",
+  variant_label: "",
+};
+
+const NEW_EXPERIMENT = "__new__";
 
 function ImageField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
   const [uploading, setUploading] = useState(false);
@@ -92,6 +113,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [totals, setTotals] = useState<Record<string, { impressions: number; clicks: number }>>({});
   const [domains, setDomains] = useState<Domain[]>([]);
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<CampaignForm>(EMPTY_FORM);
@@ -101,16 +123,19 @@ export default function CampaignsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
 
   const domainById = new Map(domains.map((d) => [d.id, d]));
+  const experimentById = new Map(experiments.map((e) => [e.id, e]));
 
   const load = async () => {
     setLoading(true);
-    const [campaignsRes, domainsRes] = await Promise.all([
+    const [campaignsRes, domainsRes, experimentsRes] = await Promise.all([
       fetch("/api/campaigns").then((r) => r.json()),
       fetch("/api/domains").then((r) => r.json()),
+      fetch("/api/campaigns/experiments").then((r) => r.json()),
     ]);
     setCampaigns(campaignsRes.campaigns || []);
     setTotals(campaignsRes.totals || {});
     setDomains(domainsRes.domains || []);
+    setExperiments(experimentsRes.experiments || []);
     setLoading(false);
   };
 
@@ -119,6 +144,21 @@ export default function CampaignsPage() {
   }, []);
 
   const canSubmit = (f: CampaignForm) => f.name.trim() && f.image_url.trim() && f.link_url.trim();
+
+  const createExperiment = async (name: string): Promise<string | null> => {
+    const res = await fetch("/api/campaigns/experiments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (!res.ok) {
+      toast.error("Failed to create experiment");
+      return null;
+    }
+    const { experiment } = await res.json();
+    setExperiments((prev) => [experiment, ...prev]);
+    return experiment.id as string;
+  };
 
   const addCampaign = async () => {
     if (!canSubmit(form)) return;
@@ -131,6 +171,7 @@ export default function CampaignsPage() {
         domain_id: form.domain_id || null,
         starts_at: form.starts_at || null,
         ends_at: form.ends_at || null,
+        experiment_id: form.experiment_id || null,
       }),
     });
     setSaving(false);
@@ -155,6 +196,8 @@ export default function CampaignsPage() {
       weight: campaign.weight,
       starts_at: campaign.starts_at ? campaign.starts_at.slice(0, 10) : "",
       ends_at: campaign.ends_at ? campaign.ends_at.slice(0, 10) : "",
+      experiment_id: campaign.experiment_id || "",
+      variant_label: campaign.variant_label || "",
     });
   };
 
@@ -172,6 +215,8 @@ export default function CampaignsPage() {
         weight: editForm.weight,
         starts_at: editForm.starts_at || null,
         ends_at: editForm.ends_at || null,
+        experiment_id: editForm.experiment_id || null,
+        variant_label: editForm.variant_label.trim() || null,
       }),
     });
     setSaving(false);
@@ -283,6 +328,51 @@ export default function CampaignsPage() {
         </div>
       </div>
       <p className="text-xs text-text-lo">Leave dates empty to run indefinitely until paused.</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Experiment (A/B test)</label>
+          <select
+            value={f.experiment_id === NEW_EXPERIMENT ? NEW_EXPERIMENT : f.experiment_id}
+            onChange={async (e) => {
+              const value = e.target.value;
+              if (value === NEW_EXPERIMENT) {
+                const name = window.prompt("Name this experiment (e.g. \"Webinar banner test\")");
+                if (!name?.trim()) return;
+                const id = await createExperiment(name.trim());
+                if (id) setF((prev) => ({ ...prev, experiment_id: id }));
+                return;
+              }
+              setF((prev) => ({ ...prev, experiment_id: value }));
+            }}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">None</option>
+            {experiments.map((exp) => (
+              <option key={exp.id} value={exp.id}>
+                {exp.name}
+              </option>
+            ))}
+            <option value={NEW_EXPERIMENT}>+ New experiment…</option>
+          </select>
+        </div>
+        {f.experiment_id && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-hi">Variant label</label>
+            <input
+              value={f.variant_label}
+              onChange={(e) => setF((prev) => ({ ...prev, variant_label: e.target.value }))}
+              placeholder="e.g. A"
+              className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        )}
+      </div>
+      {f.experiment_id && (
+        <p className="text-xs text-text-lo">
+          Group 2+ campaigns under the same experiment to compare their performance side by side on the Analytics page. Weight still controls how often each is shown.
+        </p>
+      )}
     </div>
   );
 
@@ -326,7 +416,7 @@ export default function CampaignsPage() {
                   {campaign.active ? "Active" : "Paused"}
                 </button>
               </div>
-              <p className="mb-3 text-xs text-text-lo">
+              <p className="mb-1 text-xs text-text-lo">
                 {domain ? domain.name : "All domains"}
                 {campaign.starts_at || campaign.ends_at ? (
                   <> · {campaign.starts_at?.slice(0, 10) || "any time"} → {campaign.ends_at?.slice(0, 10) || "ongoing"}</>
@@ -334,6 +424,14 @@ export default function CampaignsPage() {
                   " · Runs indefinitely"
                 )}
               </p>
+              {campaign.experiment_id && (
+                <p className="mb-3 flex items-center gap-1 text-xs text-brand-600">
+                  <Icon icon="solar:test-tube-broken" className="h-3.5 w-3.5" />
+                  {experimentById.get(campaign.experiment_id)?.name || "Experiment"}
+                  {campaign.variant_label && <> · Variant {campaign.variant_label}</>}
+                </p>
+              )}
+              {!campaign.experiment_id && <div className="mb-3" />}
               <div className="mb-3 flex items-center gap-4 text-xs text-text-lo">
                 <span>{stats.impressions} impressions</span>
                 <span>{stats.clicks} clicks</span>

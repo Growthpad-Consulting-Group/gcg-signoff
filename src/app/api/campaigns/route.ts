@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { name, image_url, link_url, domain_id, weight, starts_at, ends_at } = body;
+  const { name, image_url, link_url, domain_id, weight, starts_at, ends_at, experiment_id, variant_label } = body;
 
   if (!name?.trim() || !image_url?.trim() || !link_url?.trim()) {
     return NextResponse.json({ error: "name, image_url and link_url are required" }, { status: 400 });
@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       weight: weight || 1,
       starts_at: starts_at || null,
       ends_at: ends_at || null,
+      experiment_id: experiment_id || null,
+      variant_label: variant_label?.trim() || null,
     })
     .select("*")
     .single();

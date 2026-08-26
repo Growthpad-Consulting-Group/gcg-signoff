@@ -10,7 +10,9 @@ import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
 import GenericEmptyState from "@/shared/ui/EmptyState";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
+import SimpleModal from "@/shared/ui/SimpleModal";
 import { DEFAULT_TEMPLATE_HTML } from "@/features/signatures/lib/defaultTemplate";
+import { STARTER_TEMPLATES } from "@/features/signatures/lib/starterTemplates";
 
 interface Template {
   id: string;
@@ -151,6 +153,8 @@ function TemplatesPageInner() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("manual");
+  const [showGallery, setShowGallery] = useState(false);
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,17 +174,20 @@ function TemplatesPageInner() {
     load();
   }, []);
 
-  const createTemplate = async () => {
+  const createTemplate = async (html: string = DEFAULT_TEMPLATE_HTML) => {
+    setCreating(true);
     const res = await fetch("/api/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Untitled template", html: DEFAULT_TEMPLATE_HTML }),
+      body: JSON.stringify({ name: "Untitled template", html }),
     });
+    setCreating(false);
     if (!res.ok) {
       toast.error("Failed to create template");
       return;
     }
     const { template } = await res.json();
+    setShowGallery(false);
     router.push(`/templates/${template.id}`);
   };
 
@@ -190,7 +197,7 @@ function TemplatesPageInner() {
     if (searchParams.get("new") === "1" && !handledNewParam.current) {
       handledNewParam.current = true;
       router.replace("/templates");
-      createTemplate();
+      createTemplate(DEFAULT_TEMPLATE_HTML);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -259,7 +266,7 @@ function TemplatesPageInner() {
         title="Templates"
         description="Signature designs staff get assigned to."
         icon="solar:pen-new-square-broken"
-        actions={[{ label: "New template", icon: "solar:add-circle-broken", variant: "primary", onClick: createTemplate }]}
+        actions={[{ label: "New template", icon: "solar:add-circle-broken", variant: "primary", onClick: () => setShowGallery(true) }]}
       />
 
       {!loading && templates.length === 0 && (
@@ -267,7 +274,7 @@ function TemplatesPageInner() {
           icon="solar:pen-new-square-broken"
           title="No templates yet"
           description="Design a signature template, then assign it to staff members."
-          action={{ label: "New template", onClick: createTemplate }}
+          action={{ label: "New template", onClick: () => setShowGallery(true) }}
         />
       )}
 
@@ -334,6 +341,41 @@ function TemplatesPageInner() {
         }}
         onClose={() => setDeleteTarget(null)}
       />
+
+      <SimpleModal
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+        title="Choose a starting point"
+        subtitle="Pick a starter layout or start from scratch — you can customize everything after."
+        width="max-w-4xl"
+      >
+        <div className="grid grid-cols-1 gap-3 p-1 sm:grid-cols-2">
+          <button
+            disabled={creating}
+            onClick={() => createTemplate(DEFAULT_TEMPLATE_HTML)}
+            className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-app-border bg-surface p-6 text-center transition-colors hover:bg-surface-2 disabled:opacity-50"
+          >
+            <Icon icon="solar:add-circle-broken" className="h-8 w-8 text-text-lo" />
+            <span className="font-medium text-text-hi">Start blank</span>
+            <span className="text-xs text-text-lo">The default layout, ready to customize</span>
+          </button>
+
+          {STARTER_TEMPLATES.map((starter) => (
+            <button
+              key={starter.id}
+              disabled={creating}
+              onClick={() => createTemplate(starter.html)}
+              className="flex flex-col rounded-2xl border border-app-border bg-surface p-4 text-left transition-colors hover:bg-surface-2 disabled:opacity-50"
+            >
+              <div className="mb-3 overflow-hidden rounded-lg border border-app-border bg-white p-3">
+                <div className="pointer-events-none max-h-28 scale-[0.8] origin-top-left overflow-hidden text-black" dangerouslySetInnerHTML={{ __html: starter.html }} />
+              </div>
+              <p className="font-medium text-text-hi">{starter.name}</p>
+              <p className="mt-0.5 text-xs text-text-lo">{starter.description}</p>
+            </button>
+          ))}
+        </div>
+      </SimpleModal>
     </div>
   );
 }

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServerSupabaseClient();
-  const { data: staff, error: staffError } = await supabase.from("staff").select("id").eq("email", email).maybeSingle();
+  const { data: staff, error: staffError } = await supabase.from("staff").select("id, domain_id").eq("email", email).maybeSingle();
   if (staffError) return NextResponse.json({ error: staffError.message }, { status: 500 });
   if (!staff) return NextResponse.json({ error: "No staff record for that email" }, { status: 404 });
 
@@ -42,6 +42,19 @@ export async function POST(req: NextRequest) {
 
   if (status === "error") {
     await notifyAdmins(`Signature deploy failed for ${email}: ${error ?? "Unknown error"}`);
+  }
+
+  // A real successful deploy is the strongest signal a domain's mail path actually works —
+  // stronger than DNS alone, since DNS being correct doesn't prove the gateway is wired up.
+  if (status === "deployed") {
+    const { data: domain } = await supabase
+      .from("domains")
+      .select("id, gateway_status")
+      .eq("id", staff.domain_id)
+      .maybeSingle();
+    if (domain && domain.gateway_status !== "active") {
+      await supabase.from("domains").update({ gateway_status: "active", updated_at: new Date().toISOString() }).eq("id", domain.id);
+    }
   }
 
   return NextResponse.json({ ok: true });

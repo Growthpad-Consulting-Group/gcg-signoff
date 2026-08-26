@@ -26,6 +26,19 @@ const PLATFORM_LABEL: Record<Domain["platform"], string> = {
   other: "Other / generic SMTP",
 };
 
+const PLATFORM_SETUP_STEP: Record<Domain["platform"], string> = {
+  google_workspace: "Configure the Outbound Gateway in Google Workspace Admin Console.",
+  microsoft_365: "Configure a transport rule in the Microsoft 365 admin center.",
+  other: "Point this domain's outbound mail through your relay.",
+};
+
+interface VerifyResult {
+  provider: string | null;
+  spfRecord: string | null;
+  spfExpected: string;
+  dkimSelectors: string[];
+}
+
 const GATEWAY_STATUS_LABEL: Record<Domain["gateway_status"], string> = {
   not_configured: "Not configured",
   pending_dns: "Pending DNS",
@@ -80,6 +93,8 @@ function DomainsPageInner() {
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Domain | null>(null);
+  const [verifying, setVerifying] = useState<Set<string>>(new Set());
+  const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -166,6 +181,32 @@ function DomainsPageInner() {
     load();
   };
 
+  const verifyDns = async (domain: Domain) => {
+    setVerifying((prev) => new Set(prev).add(domain.id));
+    const res = await fetch(`/api/domains/${domain.id}/verify`, { method: "POST" });
+    setVerifying((prev) => {
+      const next = new Set(prev);
+      next.delete(domain.id);
+      return next;
+    });
+    if (!res.ok) {
+      toast.error("Failed to verify DNS");
+      return;
+    }
+    const result = await res.json();
+    setDomains((prev) => prev.map((d) => (d.id === domain.id ? result.domain : d)));
+    setVerifyResults((prev) => ({
+      ...prev,
+      [domain.id]: {
+        provider: result.provider,
+        spfRecord: result.spfRecord,
+        spfExpected: result.spfExpected,
+        dkimSelectors: result.dkimSelectors,
+      },
+    }));
+    toast.success("DNS checked");
+  };
+
   const deleteStaffCount = deleteTarget ? staffCounts[deleteTarget.id] || 0 : 0;
 
   return (
@@ -192,7 +233,14 @@ function DomainsPageInner() {
             <div className="mb-3 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate font-display text-lg font-semibold text-text-hi">{domain.name}</p>
-                <p className="text-sm text-text-lo">{PLATFORM_LABEL[domain.platform]}</p>
+                <p className="flex items-center gap-1.5 text-sm text-text-lo">
+                  {PLATFORM_LABEL[domain.platform]}
+                  {verifyResults[domain.id]?.provider && (
+                    <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-lo">
+                      DNS: {verifyResults[domain.id].provider}
+                    </span>
+                  )}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[domain.gateway_status]}`}>
@@ -217,7 +265,7 @@ function DomainsPageInner() {
 
             {domain.notes && <p className="mb-3 text-xs text-text-lo">{domain.notes}</p>}
 
-            <div className="flex items-center gap-4 text-xs text-text-lo">
+            <div className="mb-3 flex items-center gap-4 text-xs text-text-lo">
               <span className="flex items-center gap-1">
                 <Icon icon={domain.spf_verified ? "solar:check-circle-bold" : "solar:close-circle-broken"} className={domain.spf_verified ? "text-emerald-500" : "text-text-lo"} />
                 SPF
@@ -230,7 +278,54 @@ function DomainsPageInner() {
                 <Icon icon="solar:users-group-rounded-broken" className="h-3.5 w-3.5" />
                 {staffCounts[domain.id] || 0} staff
               </span>
+              <button
+                onClick={() => verifyDns(domain)}
+                disabled={verifying.has(domain.id)}
+                className="ml-auto inline-flex items-center gap-1 font-medium text-brand-600 hover:underline disabled:opacity-50"
+              >
+                {verifying.has(domain.id) ? (
+                  <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Icon icon="solar:refresh-broken" className="h-3.5 w-3.5" />
+                )}
+                Verify DNS
+              </button>
             </div>
+
+            {verifyResults[domain.id] && (
+              <div className="mb-3 space-y-1 rounded-lg bg-surface-2 p-2.5 font-mono text-[11px] text-text-lo">
+                <p className="truncate">
+                  SPF found: {verifyResults[domain.id].spfRecord || "none"}
+                </p>
+                <p className="truncate">SPF expected: {verifyResults[domain.id].spfExpected}</p>
+                <p className="truncate">
+                  DKIM selectors found: {verifyResults[domain.id].dkimSelectors.length > 0 ? verifyResults[domain.id].dkimSelectors.join(", ") : "none"}
+                </p>
+              </div>
+            )}
+
+            {domain.gateway_status !== "active" && (
+              <div className="rounded-lg border border-dashed border-app-border p-2.5">
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-lo">Next steps</p>
+                <ul className="space-y-1 text-xs text-text-lo">
+                  <li className="flex items-start gap-1.5">
+                    <Icon
+                      icon={domain.spf_verified && domain.dkim_verified ? "solar:check-circle-bold" : "solar:circle-broken"}
+                      className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${domain.spf_verified && domain.dkim_verified ? "text-emerald-500" : "text-text-lo"}`}
+                    />
+                    Add the SPF/DKIM records above at your DNS provider.
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Icon icon="solar:circle-broken" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-lo" />
+                    {PLATFORM_SETUP_STEP[domain.platform]}
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Icon icon="solar:circle-broken" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-lo" />
+                    Add staff — this domain activates automatically once their first signature deploys.
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         ))}
       </div>

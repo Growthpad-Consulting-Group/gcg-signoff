@@ -5,7 +5,8 @@ const BUCKET = "signature-assets";
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
-  const files = formData.getAll("files").filter((f): f is File => f instanceof File);
+  // GrapesJS's default multiUpload:true appends "[]" to the field name ("files[]"); accept both.
+  const files = [...formData.getAll("files"), ...formData.getAll("files[]")].filter((f): f is File => f instanceof File);
   if (files.length === 0) {
     return NextResponse.json({ error: "No files provided" }, { status: 400 });
   }

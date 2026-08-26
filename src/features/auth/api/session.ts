@@ -25,20 +25,17 @@ export async function createSession(userId: string) {
 
 export async function getUserForSessionToken(token: string) {
   const supabase = createServerSupabaseClient();
+  // Single embedded-join query instead of two sequential round-trips (session lookup, then
+  // user lookup) — this runs on nearly every request via proxy.ts, so it matters app-wide.
   const { data: session } = await supabase
     .from("sessions")
-    .select("user_id, expires_at")
+    .select("expires_at, users(id, email, name)")
     .eq("token_hash", hashToken(token))
     .maybeSingle();
 
   if (!session || new Date(session.expires_at) < new Date()) return null;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("id, email, name")
-    .eq("id", session.user_id)
-    .maybeSingle();
-
+  const user = Array.isArray(session.users) ? session.users[0] : session.users;
   return user ?? null;
 }
 

@@ -3,10 +3,16 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import PageHeader from "@/shared/ui/PageHeader";
-import DeployStatusChart from "@/features/dashboard/ui/DeployStatusChart";
 import DomainHealthStrip from "@/features/dashboard/ui/DomainHealthStrip";
 import RecentActivity from "@/features/dashboard/ui/RecentActivity";
+
+// Recharts is ~1MB — defer it out of the initial dashboard bundle so stat cards paint first.
+const DeployStatusChart = dynamic(() => import("@/features/dashboard/ui/DeployStatusChart"), {
+  ssr: false,
+  loading: () => <div className="h-36" />,
+});
 
 interface Domain {
   id: string;

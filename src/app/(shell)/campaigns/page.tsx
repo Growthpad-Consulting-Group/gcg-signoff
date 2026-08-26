@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
@@ -8,6 +8,8 @@ import SimpleModal from "@/shared/ui/SimpleModal";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button from "@/shared/ui/Button";
 import GenericEmptyState from "@/shared/ui/EmptyState";
+import ModalLeftPanel, { ImagePreview, ProTip } from "@/shared/ui/ModalLeftPanel";
+import MediaPicker from "@/shared/ui/MediaPicker";
 
 interface Domain {
   id: string;
@@ -60,22 +62,7 @@ const EMPTY_FORM: CampaignForm = {
 const NEW_EXPERIMENT = "__new__";
 
 function ImageField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const upload = async (file: File) => {
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("files", file);
-    const res = await fetch("/api/uploads", { method: "POST", body: formData });
-    setUploading(false);
-    if (!res.ok) {
-      toast.error("Failed to upload image");
-      return;
-    }
-    const { data } = await res.json();
-    if (data?.[0]) onChange(data[0]);
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <div className="space-y-2">
@@ -83,28 +70,15 @@ function ImageField({ value, onChange }: { value: string; onChange: (url: string
         // eslint-disable-next-line @next/next/no-img-element -- uploaded via our own storage bucket, but arbitrary path
         <img src={value} alt="Banner preview" className="h-16 w-full rounded-lg border border-app-border object-cover" />
       )}
-      <div className="flex items-center gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) upload(file);
-            e.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
-        >
-          {uploading ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:gallery-broken" className="h-3.5 w-3.5" />}
-          {uploading ? "Uploading…" : value ? "Change image" : "Upload image"}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setPickerOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2"
+      >
+        <Icon icon="solar:gallery-broken" className="h-3.5 w-3.5" />
+        {value ? "Change image" : "Choose image"}
+      </button>
+      <MediaPicker isOpen={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={onChange} />
     </div>
   );
 }
@@ -458,12 +432,31 @@ export default function CampaignsPage() {
         })}
       </div>
 
-      <SimpleModal isOpen={showAdd} onClose={() => setShowAdd(false)} title="New campaign" width="max-w-md">
-        <div className="space-y-4">
-          <FormFields f={form} setF={setForm} />
-          <Button className="w-full" onClick={addCampaign} disabled={!canSubmit(form) || saving}>
-            {saving ? "Creating…" : "Create campaign"}
-          </Button>
+      <SimpleModal isOpen={showAdd} onClose={() => setShowAdd(false)} title="" width="max-w-4xl" noPadding>
+        <div className="grid lg:grid-cols-5">
+          <ModalLeftPanel
+            title="New campaign"
+            subtitle="Banners run automatically at send-time, appended below every matching signature — no template editing needed."
+            icon="solar:flag-broken"
+            footer={
+              <ProTip icon="solar:shuffle-broken">
+                Give two or more overlapping campaigns different weights to control how often each is shown — higher weight means more frequent rotation.
+              </ProTip>
+            }
+          >
+            <ImagePreview src={form.image_url || undefined} alt="Banner preview" fallbackIcon="solar:gallery-broken" />
+          </ModalLeftPanel>
+
+          <div className="flex max-h-[80vh] flex-col lg:col-span-3">
+            <div className="flex-1 space-y-4 overflow-y-auto p-8">
+              <FormFields f={form} setF={setForm} />
+            </div>
+            <div className="border-t border-app-border p-6">
+              <Button className="w-full" onClick={addCampaign} disabled={!canSubmit(form) || saving}>
+                {saving ? "Creating…" : "Create campaign"}
+              </Button>
+            </div>
+          </div>
         </div>
       </SimpleModal>
 
@@ -473,15 +466,35 @@ export default function CampaignsPage() {
           setEditTarget(null);
           setEditForm(null);
         }}
-        title={`Edit ${editTarget?.name ?? "campaign"}`}
-        width="max-w-md"
+        title=""
+        width="max-w-4xl"
+        noPadding
       >
         {editForm && (
-          <div className="space-y-4">
-            <FormFields f={editForm} setF={(updater) => setEditForm((prev) => (prev ? updater(prev) : prev))} />
-            <Button className="w-full" onClick={saveEdit} disabled={!canSubmit(editForm) || saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
+          <div className="grid lg:grid-cols-5">
+            <ModalLeftPanel
+              title={`Edit ${editTarget?.name ?? "campaign"}`}
+              subtitle="Banners run automatically at send-time, appended below every matching signature."
+              icon="solar:flag-broken"
+              footer={
+                <ProTip icon="solar:shuffle-broken">
+                  Give two or more overlapping campaigns different weights to control how often each is shown — higher weight means more frequent rotation.
+                </ProTip>
+              }
+            >
+              <ImagePreview src={editForm.image_url || undefined} alt="Banner preview" fallbackIcon="solar:gallery-broken" />
+            </ModalLeftPanel>
+
+            <div className="flex max-h-[80vh] flex-col lg:col-span-3">
+              <div className="flex-1 space-y-4 overflow-y-auto p-8">
+                <FormFields f={editForm} setF={(updater) => setEditForm((prev) => (prev ? updater(prev) : prev))} />
+              </div>
+              <div className="border-t border-app-border p-6">
+                <Button className="w-full" onClick={saveEdit} disabled={!canSubmit(editForm) || saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </SimpleModal>

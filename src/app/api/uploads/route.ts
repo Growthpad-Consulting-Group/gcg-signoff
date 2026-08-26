@@ -24,6 +24,10 @@ export async function POST(req: NextRequest) {
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     urls.push(data.publicUrl);
+
+    // Track it so it can be browsed and reused later from the media library, instead of
+    // forcing a fresh upload every time the same image is wanted elsewhere.
+    await supabase.from("media_assets").insert({ path, public_url: data.publicUrl, filename: file.name });
   }
 
   return NextResponse.json({ data: urls });

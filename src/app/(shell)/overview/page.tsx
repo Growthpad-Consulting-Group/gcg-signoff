@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import PageHeader from "@/shared/ui/PageHeader";
 import DomainHealthStrip from "@/features/dashboard/ui/DomainHealthStrip";
 import RecentActivity from "@/features/dashboard/ui/RecentActivity";
+import CampaignSummary from "@/features/campaigns/ui/CampaignSummary";
 
 // Recharts is ~1MB — defer it out of the initial dashboard bundle so stat cards paint first.
 const DeployStatusChart = dynamic(() => import("@/features/dashboard/ui/DeployStatusChart"), {
@@ -126,9 +127,16 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
-          <h2 className="mb-4 font-display text-sm font-semibold text-text-hi">Recent activity</h2>
-          <RecentActivity />
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+            <h2 className="mb-4 font-display text-sm font-semibold text-text-hi">Recent activity</h2>
+            <RecentActivity />
+          </div>
+
+          <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+            <h2 className="mb-3 font-display text-sm font-semibold text-text-hi">Campaign performance</h2>
+            <CampaignSummary />
+          </div>
         </div>
       </div>
     </div>

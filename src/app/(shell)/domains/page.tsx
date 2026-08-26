@@ -9,6 +9,7 @@ import SimpleModal from "@/shared/ui/SimpleModal";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button from "@/shared/ui/Button";
 import GenericEmptyState from "@/shared/ui/EmptyState";
+import SetupGuideModal from "@/features/domains/ui/SetupGuideModal";
 
 interface Domain {
   id: string;
@@ -95,6 +96,7 @@ function DomainsPageInner() {
   const [deleteTarget, setDeleteTarget] = useState<Domain | null>(null);
   const [verifying, setVerifying] = useState<Set<string>>(new Set());
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
+  const [guideTarget, setGuideTarget] = useState<Domain | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -306,7 +308,16 @@ function DomainsPageInner() {
 
             {domain.gateway_status !== "active" && (
               <div className="rounded-lg border border-dashed border-app-border p-2.5">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-lo">Next steps</p>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-text-lo">Next steps</p>
+                  <button
+                    onClick={() => setGuideTarget(domain)}
+                    className="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:underline"
+                  >
+                    <Icon icon="solar:book-broken" className="h-3 w-3" />
+                    Setup guide
+                  </button>
+                </div>
                 <ul className="space-y-1 text-xs text-text-lo">
                   <li className="flex items-start gap-1.5">
                     <Icon
@@ -413,25 +424,30 @@ function DomainsPageInner() {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-text-lo">Set to Active once the gateway is really deploying signatures for this domain.</p>
+              <p className="mt-1 text-xs text-text-lo">
+                This normally flips to Active automatically on this domain's first successful signature deploy — only override it here for a manual exception.
+              </p>
             </div>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm text-text-hi">
-                <input
-                  type="checkbox"
-                  checked={editForm.spf_verified}
-                  onChange={(e) => setEditForm({ ...editForm, spf_verified: e.target.checked })}
-                />
-                SPF verified
-              </label>
-              <label className="flex items-center gap-2 text-sm text-text-hi">
-                <input
-                  type="checkbox"
-                  checked={editForm.dkim_verified}
-                  onChange={(e) => setEditForm({ ...editForm, dkim_verified: e.target.checked })}
-                />
-                DKIM verified
-              </label>
+            <div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-text-hi">
+                  <input
+                    type="checkbox"
+                    checked={editForm.spf_verified}
+                    onChange={(e) => setEditForm({ ...editForm, spf_verified: e.target.checked })}
+                  />
+                  SPF verified
+                </label>
+                <label className="flex items-center gap-2 text-sm text-text-hi">
+                  <input
+                    type="checkbox"
+                    checked={editForm.dkim_verified}
+                    onChange={(e) => setEditForm({ ...editForm, dkim_verified: e.target.checked })}
+                  />
+                  DKIM verified
+                </label>
+              </div>
+              <p className="mt-1 text-xs text-text-lo">These are normally set by "Verify DNS" on the domain card — only check manually if you've confirmed it another way.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-hi">Notes</label>
@@ -462,6 +478,15 @@ function DomainsPageInner() {
         onConfirm={deleteDomain}
         onClose={() => setDeleteTarget(null)}
       />
+
+      {guideTarget && (
+        <SetupGuideModal
+          isOpen={!!guideTarget}
+          onClose={() => setGuideTarget(null)}
+          platform={guideTarget.platform}
+          domainName={guideTarget.name}
+        />
+      )}
     </div>
   );
 }

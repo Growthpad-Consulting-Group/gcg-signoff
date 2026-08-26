@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
 import SimpleModal from "@/shared/ui/SimpleModal";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button from "@/shared/ui/Button";
 import GenericEmptyState from "@/shared/ui/EmptyState";
 
@@ -46,6 +47,9 @@ interface Staff {
   role_title: string | null;
   department: string | null;
   phone: string | null;
+  mobile: string | null;
+  photo_url: string | null;
+  status: "active" | "suspended";
   signature_assignments: Assignment[] | Assignment | null;
 }
 
@@ -58,6 +62,174 @@ const STATUS_STYLE: Record<string, string> = {
 function assignmentOf(staff: Staff): Assignment | null {
   if (!staff.signature_assignments) return null;
   return Array.isArray(staff.signature_assignments) ? staff.signature_assignments[0] ?? null : staff.signature_assignments;
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+  if (photoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element -- external URLs of arbitrary hosts aren't allowlisted for next/image
+    return <img src={photoUrl} alt={name} width={28} height={28} className="h-7 w-7 rounded-full object-cover" />;
+  }
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500/10 text-[11px] font-semibold text-brand-600">
+      {initials(name)}
+    </span>
+  );
+}
+
+interface StaffForm {
+  domain_id: string;
+  email: string;
+  full_name: string;
+  role_title: string;
+  department: string;
+  phone: string;
+  mobile: string;
+  photo_url: string;
+  template_id: string;
+}
+
+const EMPTY_FORM: StaffForm = {
+  domain_id: "",
+  email: "",
+  full_name: "",
+  role_title: "",
+  department: "",
+  phone: "",
+  mobile: "",
+  photo_url: "",
+  template_id: "",
+};
+
+function StaffFormFields({
+  form,
+  setForm,
+  domains,
+  templates,
+  showDomainField,
+}: {
+  form: StaffForm;
+  setForm: (updater: (f: StaffForm) => StaffForm) => void;
+  domains: Domain[];
+  templates: Template[];
+  showDomainField: boolean;
+}) {
+  const selectedDomain = domains.find((d) => d.id === form.domain_id);
+
+  return (
+    <div className="space-y-4">
+      {showDomainField && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
+          <select
+            value={form.domain_id}
+            onChange={(e) => setForm((f) => ({ ...f, domain_id: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="" disabled>
+              Select domain
+            </option>
+            {domains.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+          {selectedDomain && selectedDomain.gateway_status !== "active" && (
+            <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+              <Icon icon="solar:danger-triangle-broken" className="h-3.5 w-3.5 shrink-0" />
+              This domain&apos;s mail gateway isn&apos;t active yet — signatures won&apos;t deploy until it is.
+            </p>
+          )}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Full name</label>
+          <input
+            value={form.full_name}
+            onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Email</label>
+          <input
+            value={form.email}
+            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            placeholder="name@growthpad.co.ke"
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Role / title</label>
+          <input
+            value={form.role_title}
+            onChange={(e) => setForm((f) => ({ ...f, role_title: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Department</label>
+          <input
+            value={form.department}
+            onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Phone</label>
+          <input
+            value={form.phone}
+            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-hi">Mobile</label>
+          <input
+            value={form.mobile}
+            onChange={(e) => setForm((f) => ({ ...f, mobile: e.target.value }))}
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="col-span-2">
+          <label className="mb-1 block text-sm font-medium text-text-hi">Photo URL</label>
+          <input
+            value={form.photo_url}
+            onChange={(e) => setForm((f) => ({ ...f, photo_url: e.target.value }))}
+            placeholder="https://..."
+            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        {showDomainField && (
+          <div className="col-span-2">
+            <label className="mb-1 block text-sm font-medium text-text-hi">Signature template</label>
+            <select
+              value={form.template_id}
+              onChange={(e) => setForm((f) => ({ ...f, template_id: e.target.value }))}
+              className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">None yet</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function StaffPage() {
@@ -73,23 +245,23 @@ function StaffPageInner() {
   const [domains, setDomains] = useState<Domain[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkTemplateId, setBulkTemplateId] = useState("");
   const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Staff | null>(null);
+  const [editForm, setEditForm] = useState<StaffForm | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [form, setForm] = useState({
-    domain_id: "",
-    email: "",
-    full_name: "",
-    role_title: "",
-    department: "",
-    phone: "",
-    template_id: "",
-  });
+  const [form, setForm] = useState<StaffForm>(EMPTY_FORM);
 
   const load = async () => {
     setLoading(true);
@@ -117,16 +289,24 @@ function StaffPageInner() {
   }, [searchParams]);
 
   const domainById = useMemo(() => new Map(domains.map((d) => [d.id, d])), [domains]);
-  const selectedDomain = domains.find((d) => d.id === form.domain_id);
 
   const canSubmit = useMemo(() => form.domain_id && form.email.trim() && form.full_name.trim(), [form]);
 
+  const visibleStaff = useMemo(() => {
+    if (!searchQuery.trim()) return staff;
+    const q = searchQuery.trim().toLowerCase();
+    return staff.filter((s) => s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
+  }, [staff, searchQuery]);
+
   const addStaff = async () => {
+    if (adding) return;
+    setAdding(true);
     const res = await fetch("/api/staff", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+    setAdding(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       toast.error(body.error || "Failed to add staff member");
@@ -134,7 +314,7 @@ function StaffPageInner() {
     }
     toast.success("Staff member added");
     setShowAdd(false);
-    setForm({ domain_id: "", email: "", full_name: "", role_title: "", department: "", phone: "", template_id: "" });
+    setForm(EMPTY_FORM);
     load();
   };
 
@@ -151,6 +331,77 @@ function StaffPageInner() {
     load();
   };
 
+  const openEdit = (person: Staff) => {
+    setEditTarget(person);
+    setEditForm({
+      domain_id: person.domain_id,
+      email: person.email,
+      full_name: person.full_name,
+      role_title: person.role_title || "",
+      department: person.department || "",
+      phone: person.phone || "",
+      mobile: person.mobile || "",
+      photo_url: person.photo_url || "",
+      template_id: assignmentOf(person)?.template_id || "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget || !editForm) return;
+    setSavingEdit(true);
+    const res = await fetch(`/api/staff/${editTarget.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: editForm.full_name,
+        email: editForm.email,
+        role_title: editForm.role_title || null,
+        department: editForm.department || null,
+        phone: editForm.phone || null,
+        mobile: editForm.mobile || null,
+        photo_url: editForm.photo_url || null,
+      }),
+    });
+    setSavingEdit(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to save staff member");
+      return;
+    }
+    toast.success("Staff member updated");
+    setEditTarget(null);
+    setEditForm(null);
+    load();
+  };
+
+  const toggleStatus = async (person: Staff) => {
+    const nextStatus = person.status === "active" ? "suspended" : "active";
+    setStaff((prev) => prev.map((s) => (s.id === person.id ? { ...s, status: nextStatus } : s)));
+    const res = await fetch(`/api/staff/${person.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    if (!res.ok) {
+      toast.error("Failed to update status");
+      load();
+      return;
+    }
+    toast.success(nextStatus === "suspended" ? "Staff member suspended" : "Staff member reactivated");
+  };
+
+  const deleteStaff = async () => {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/staff/${deleteTarget.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Failed to delete staff member");
+      return;
+    }
+    toast.success("Staff member deleted");
+    setDeleteTarget(null);
+    setStaff((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+  };
+
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -161,7 +412,7 @@ function StaffPageInner() {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds((prev) => (prev.size === staff.length ? new Set() : new Set(staff.map((s) => s.id))));
+    setSelectedIds((prev) => (prev.size === visibleStaff.length ? new Set() : new Set(visibleStaff.map((s) => s.id))));
   };
 
   const applyBulkTemplate = async () => {
@@ -180,6 +431,19 @@ function StaffPageInner() {
     toast.success(`Template applied to ${selectedIds.size} staff member${selectedIds.size === 1 ? "" : "s"}`);
     setSelectedIds(new Set());
     setBulkTemplateId("");
+    load();
+  };
+
+  const bulkDelete = async () => {
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const results = await Promise.all(ids.map((id) => fetch(`/api/staff/${id}`, { method: "DELETE" })));
+    setBulkDeleting(false);
+    setShowBulkDeleteConfirm(false);
+    const failed = results.filter((r) => !r.ok).length;
+    if (failed > 0) toast.error(`Failed to delete ${failed} of ${ids.length}`);
+    else toast.success(`Deleted ${ids.length} staff member${ids.length === 1 ? "" : "s"}`);
+    setSelectedIds(new Set());
     load();
   };
 
@@ -222,6 +486,18 @@ function StaffPageInner() {
         />
       )}
 
+      {staff.length > 0 && (
+        <div className="mb-3 relative max-w-xs">
+          <Icon icon="solar:magnifer-broken" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-lo" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or email..."
+            className="w-full rounded-lg border border-app-border bg-surface py-2 pl-9 pr-3 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+      )}
+
       {selectedIds.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-app-border bg-surface-2 px-4 py-2.5">
           <span className="text-sm font-medium text-text-hi">{selectedIds.size} selected</span>
@@ -247,35 +523,44 @@ function StaffPageInner() {
             {bulkApplying && <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />}
             Apply to {selectedIds.size}
           </button>
+          <button
+            onClick={() => setShowBulkDeleteConfirm(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-status-danger/30 px-3 py-1.5 text-xs font-medium text-status-danger transition-colors hover:bg-status-danger/10"
+          >
+            <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
+            Delete {selectedIds.size}
+          </button>
           <button onClick={() => setSelectedIds(new Set())} className="text-xs font-medium text-text-lo hover:text-text-hi">
             Clear
           </button>
         </div>
       )}
 
-      {staff.length > 0 && (
+      {visibleStaff.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-app-border bg-surface shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b border-app-border bg-surface-2 text-left text-xs uppercase tracking-wide text-text-lo">
               <tr>
                 <th className="px-4 py-3">
-                  <input type="checkbox" checked={selectedIds.size === staff.length} onChange={toggleSelectAll} className="rounded border-app-border" />
+                  <input type="checkbox" checked={selectedIds.size === visibleStaff.length} onChange={toggleSelectAll} className="rounded border-app-border" />
                 </th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Template</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {staff.map((person) => {
+              {visibleStaff.map((person) => {
                 const assignment = assignmentOf(person);
                 const domain = domainById.get(person.domain_id);
                 const domainInactive = domain && domain.gateway_status !== "active";
                 const stuck = isStuckPending(assignment);
+                const suspended = person.status === "suspended";
                 return (
-                  <tr key={person.id} className="border-b border-app-border last:border-0">
+                  <tr key={person.id} className={`border-b border-app-border last:border-0 ${suspended ? "opacity-50" : ""}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
@@ -284,7 +569,17 @@ function StaffPageInner() {
                         className="rounded border-app-border"
                       />
                     </td>
-                    <td className="px-4 py-3 font-medium text-text-hi">{person.full_name}</td>
+                    <td className="px-4 py-3 font-medium text-text-hi">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={person.full_name} photoUrl={person.photo_url} />
+                        <span>{person.full_name}</span>
+                        {suspended && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            Suspended
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-text-lo">{person.email}</td>
                     <td className="px-4 py-3 text-text-lo">
                       {person.role_title}
@@ -333,6 +628,31 @@ function StaffPageInner() {
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => toggleStatus(person)}
+                          className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+                          title={suspended ? "Reactivate" : "Suspend"}
+                        >
+                          <Icon icon={suspended ? "solar:play-circle-broken" : "solar:pause-circle-broken"} className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => openEdit(person)}
+                          className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+                          title="Edit"
+                        >
+                          <Icon icon="solar:pen-broken" className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(person)}
+                          className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-status-danger/10 hover:text-status-danger"
+                          title="Delete"
+                        >
+                          <Icon icon="solar:trash-bin-trash-broken" className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -343,93 +663,56 @@ function StaffPageInner() {
 
       <SimpleModal isOpen={showAdd} onClose={() => setShowAdd(false)} title="Add staff member" width="max-w-lg">
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
-            <select
-              value={form.domain_id}
-              onChange={(e) => setForm((f) => ({ ...f, domain_id: e.target.value }))}
-              className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="" disabled>
-                Select domain
-              </option>
-              {domains.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            {selectedDomain && selectedDomain.gateway_status !== "active" && (
-              <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                <Icon icon="solar:danger-triangle-broken" className="h-3.5 w-3.5 shrink-0" />
-                This domain&apos;s mail gateway isn&apos;t active yet — signatures won&apos;t deploy until it is.
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Full name</label>
-              <input
-                value={form.full_name}
-                onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Email</label>
-              <input
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="name@growthpad.co.ke"
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Role / title</label>
-              <input
-                value={form.role_title}
-                onChange={(e) => setForm((f) => ({ ...f, role_title: e.target.value }))}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Department</label>
-              <input
-                value={form.department}
-                onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Phone</label>
-              <input
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Signature template</label>
-              <select
-                value={form.template_id}
-                onChange={(e) => setForm((f) => ({ ...f, template_id: e.target.value }))}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">None yet</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <Button className="w-full" onClick={addStaff} disabled={!canSubmit}>
+          <StaffFormFields form={form} setForm={setForm} domains={domains} templates={templates} showDomainField />
+          <Button className="w-full" onClick={addStaff} disabled={!canSubmit || adding}>
             <Icon icon="solar:user-plus-broken" className="h-4 w-4" />
-            Add staff member
+            {adding ? "Adding…" : "Add staff member"}
           </Button>
         </div>
       </SimpleModal>
+
+      <SimpleModal
+        isOpen={!!editTarget}
+        onClose={() => {
+          setEditTarget(null);
+          setEditForm(null);
+        }}
+        title={`Edit ${editTarget?.full_name ?? "staff member"}`}
+        width="max-w-lg"
+      >
+        {editForm && (
+          <div className="space-y-4">
+            <StaffFormFields
+              form={editForm}
+              setForm={(updater) => setEditForm((f) => (f ? updater(f) : f))}
+              domains={domains}
+              templates={templates}
+              showDomainField={false}
+            />
+            <Button className="w-full" onClick={saveEdit} disabled={savingEdit}>
+              {savingEdit ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
+        )}
+      </SimpleModal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete staff member?"
+        message={`Delete "${deleteTarget?.full_name}"? Their signature assignment will be removed too. This can't be undone.`}
+        confirmLabel="Delete"
+        onConfirm={deleteStaff}
+        onClose={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={showBulkDeleteConfirm}
+        title={`Delete ${selectedIds.size} staff members?`}
+        message={bulkDeleting ? "Deleting…" : "This can't be undone."}
+        confirmLabel="Delete"
+        onConfirm={bulkDelete}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+      />
     </div>
   );
 }

@@ -30,11 +30,16 @@ export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseClient();
   const { data: staff, error } = await supabase
     .from("staff")
-    .insert({ domain_id, email, full_name, role_title, department, phone, mobile, photo_url })
+    .insert({ domain_id, email: email.trim().toLowerCase(), full_name, role_title, department, phone, mobile, photo_url })
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "23505") {
+      return NextResponse.json({ error: `"${email}" is already in use` }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   if (template_id) {
     const { error: assignError } = await supabase

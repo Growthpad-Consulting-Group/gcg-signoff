@@ -25,7 +25,7 @@ export default function CampaignSummary() {
   if (data && data.campaigns.length === 0) {
     return (
       <Link href="/campaigns" className="flex flex-col items-center gap-2 rounded-lg py-4 text-center transition-colors hover:bg-surface-2">
-        <Icon icon="solar:megaphone-broken" className="h-6 w-6 text-text-lo" />
+        <Icon icon="solar:flag-broken" className="h-6 w-6 text-text-lo" />
         <p className="text-sm text-text-lo">No campaigns yet — add a banner to your signatures.</p>
       </Link>
     );

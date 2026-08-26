@@ -291,13 +291,13 @@ export default function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         description="Banners appended below signatures at send-time — no template editing needed."
-        icon="solar:megaphone-broken"
+        icon="solar:flag-broken"
         actions={[{ label: "New campaign", icon: "solar:add-circle-broken", variant: "primary", onClick: () => setShowAdd(true) }]}
       />
 
       {!loading && campaigns.length === 0 && (
         <GenericEmptyState
-          icon="solar:megaphone-broken"
+          icon="solar:flag-broken"
           title="No campaigns yet"
           description="Add a banner to run on staff signatures — target everyone or a specific domain, with an optional date range."
           action={{ label: "New campaign", onClick: () => setShowAdd(true) }}

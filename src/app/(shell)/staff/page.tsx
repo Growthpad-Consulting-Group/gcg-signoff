@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
@@ -85,6 +85,56 @@ function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
   );
 }
 
+function PhotoField({ value, onChange, name }: { value: string; onChange: (url: string) => void; name: string }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("files", file);
+    const res = await fetch("/api/uploads", { method: "POST", body: formData });
+    setUploading(false);
+    if (!res.ok) {
+      toast.error("Failed to upload photo");
+      return;
+    }
+    const { data } = await res.json();
+    if (data?.[0]) onChange(data[0]);
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <Avatar name={name || "?"} photoUrl={value || null} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) upload(file);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
+      >
+        {uploading ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:camera-broken" className="h-3.5 w-3.5" />}
+        {uploading ? "Uploading…" : value ? "Change photo" : "Upload photo"}
+      </button>
+      {value && (
+        <button type="button" onClick={() => onChange("")} className="text-xs font-medium text-text-lo hover:text-status-danger">
+          Remove
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface StaffForm {
   domain_id: string;
   email: string;
@@ -165,7 +215,7 @@ function StaffFormFields({
           <input
             value={form.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            placeholder="name@growthpad.co.ke"
+            placeholder={selectedDomain ? `name@${selectedDomain.name}` : "name@yourcompany.com"}
             className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
@@ -202,13 +252,8 @@ function StaffFormFields({
           />
         </div>
         <div className="col-span-2">
-          <label className="mb-1 block text-sm font-medium text-text-hi">Photo URL</label>
-          <input
-            value={form.photo_url}
-            onChange={(e) => setForm((f) => ({ ...f, photo_url: e.target.value }))}
-            placeholder="https://..."
-            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          <label className="mb-1 block text-sm font-medium text-text-hi">Photo</label>
+          <PhotoField value={form.photo_url} onChange={(url) => setForm((f) => ({ ...f, photo_url: url }))} name={form.full_name} />
         </div>
         {showDomainField && (
           <div className="col-span-2">

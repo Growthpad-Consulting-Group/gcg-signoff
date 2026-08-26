@@ -22,46 +22,14 @@ const PLATFORM_ICON: Record<Platform, string> = {
 };
 
 const PLATFORM_SUBTITLE: Record<Platform, string> = {
-  google_workspace: "Fully supported by the built-in gateway.",
+  google_workspace: "The gateway infrastructure is already deployed — these are just the steps left for this specific domain.",
   microsoft_365: "The gateway doesn't have a Microsoft 365 connector yet — this is a starting point, not a turnkey guide.",
   other: "No built-in integration — you'll need your own relay.",
 };
 
+// Deploying the gateway VM, restricting its IPs, and enabling Google's SMTP Relay service are
+// one-time org-wide infrastructure — not repeated per domain, so they're not steps here.
 const GOOGLE_WORKSPACE_STEPS = [
-  {
-    icon: "solar:server-broken",
-    title: "Deploy the gateway somewhere with a static outbound IP",
-    body: "A small always-on VM works — it's a long-running TCP listener, not a serverless function. Run it behind TLS if possible; Google supports STARTTLS to the gateway.",
-  },
-  {
-    icon: "solar:shield-check-broken",
-    title: "Restrict who can talk to it",
-    body: (
-      <>
-        Set <code className="rounded bg-surface-2 px-1">GATEWAY_ALLOWED_IPS</code> to Google's published outbound-gateway IP ranges for your Workspace instance (shown in the Admin console when you configure the step below). Never leave this empty in production.
-      </>
-    ),
-  },
-  {
-    icon: "solar:refresh-circle-broken",
-    title: "Enable Google's SMTP Relay service",
-    body: "Admin console → Apps → Google Workspace → Gmail → Routing → SMTP relay service. Allow-list the gateway's own outbound IP there — this lets it hand mail back to Google for final delivery without needing its own SPF/DKIM setup. No DNS changes required for this step.",
-  },
-  {
-    icon: "solar:routing-2-broken",
-    title: "Configure the Outbound Gateway",
-    body: "Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at your gateway's public host:port. Start scoped to a single test OU, not the whole org.",
-  },
-  {
-    icon: "solar:letter-broken",
-    title: "Send a real test message",
-    body: "From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.",
-  },
-  {
-    icon: "solar:widget-broken",
-    title: "Widen the OU scope gradually",
-    body: "Watch gateway logs for errors as you roll out to more of the domain.",
-  },
   {
     icon: "solar:key-minimalistic-square-broken",
     title: "Add the SPF/DKIM records",
@@ -71,6 +39,21 @@ const GOOGLE_WORKSPACE_STEPS = [
         <code className="rounded bg-surface-2 px-1">v=spf1 include:_spf.google.com ~all</code> for SPF.
       </>
     ),
+  },
+  {
+    icon: "solar:routing-2-broken",
+    title: "Configure the Outbound Gateway for this domain",
+    body: "Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at the gateway's host:port. Start scoped to a single test OU in this domain, not the whole org.",
+  },
+  {
+    icon: "solar:letter-broken",
+    title: "Send a real test message",
+    body: "From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.",
+  },
+  {
+    icon: "solar:widget-broken",
+    title: "Widen the OU scope gradually",
+    body: "Watch gateway logs for errors as you roll out to the rest of this domain's org units.",
   },
 ];
 

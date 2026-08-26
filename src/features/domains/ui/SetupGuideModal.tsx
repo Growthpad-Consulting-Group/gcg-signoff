@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import SimpleModal from "@/shared/ui/SimpleModal";
 import ModalLeftPanel, { ProTip } from "@/shared/ui/ModalLeftPanel";
@@ -10,6 +11,7 @@ interface SetupGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
   platform: Platform;
+  domainId: string;
   domainName: string;
 }
 
@@ -20,28 +22,88 @@ const PLATFORM_ICON: Record<Platform, string> = {
 };
 
 const PLATFORM_SUBTITLE: Record<Platform, string> = {
-  google_workspace: "Fully supported by the built-in gateway — follow these steps in order.",
+  google_workspace: "Fully supported by the built-in gateway — check off each step as you go.",
   microsoft_365: "The gateway doesn't have a Microsoft 365 connector yet — this is a starting point, not a turnkey guide.",
   other: "No built-in integration — you'll need your own relay.",
 };
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/10 text-xs font-semibold text-brand-600">
-        {n}
-      </span>
-      <div>
-        <p className="text-sm font-medium text-text-hi">{title}</p>
-        <div className="mt-0.5 text-xs leading-relaxed text-text-lo">{children}</div>
-      </div>
-    </li>
-  );
+const GOOGLE_WORKSPACE_STEPS = [
+  {
+    title: "Deploy the gateway somewhere with a static outbound IP",
+    body: "A small always-on VM works — it's a long-running TCP listener, not a serverless function. Run it behind TLS if possible; Google supports STARTTLS to the gateway.",
+  },
+  {
+    title: "Restrict who can talk to it",
+    body: (
+      <>
+        Set <code className="rounded bg-surface-2 px-1">GATEWAY_ALLOWED_IPS</code> to Google's published outbound-gateway IP ranges for your Workspace instance (shown in the Admin console when you configure the step below). Never leave this empty in production.
+      </>
+    ),
+  },
+  {
+    title: "Enable Google's SMTP Relay service",
+    body: "Admin console → Apps → Google Workspace → Gmail → Routing → SMTP relay service. Allow-list the gateway's own outbound IP there — this lets it hand mail back to Google for final delivery without needing its own SPF/DKIM setup. No DNS changes required for this step.",
+  },
+  {
+    title: "Configure the Outbound Gateway",
+    body: "Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at your gateway's public host:port. Start scoped to a single test OU, not the whole org.",
+  },
+  {
+    title: "Send a real test message",
+    body: "From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.",
+  },
+  {
+    title: "Widen the OU scope gradually",
+    body: "Watch gateway logs for errors as you roll out to more of the domain.",
+  },
+  {
+    title: "Add the SPF/DKIM records",
+    body: (
+      <>
+        Turn on DKIM signing in Admin console → Apps → Google Workspace → Gmail → Authenticate email, then add the TXT record it gives you plus{" "}
+        <code className="rounded bg-surface-2 px-1">v=spf1 include:_spf.google.com ~all</code> for SPF.
+      </>
+    ),
+  },
+];
+
+function storageKey(domainId: string) {
+  return `signoff:domain-setup:${domainId}`;
 }
 
-export default function SetupGuideModal({ isOpen, onClose, platform, domainName }: SetupGuideModalProps) {
+function loadChecked(domainId: string): Set<number> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(storageKey(domainId));
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export default function SetupGuideModal({ isOpen, onClose, platform, domainId, domainName }: SetupGuideModalProps) {
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (isOpen) setChecked(loadChecked(domainId));
+  }, [isOpen, domainId]);
+
+  const toggleStep = (i: number) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      try {
+        window.localStorage.setItem(storageKey(domainId), JSON.stringify([...next]));
+      } catch {
+        // localStorage can throw in private browsing; the checklist just won't persist.
+      }
+      return next;
+    });
+  };
+
   return (
-    <SimpleModal isOpen={isOpen} onClose={onClose} title="" width="max-w-3xl" noPadding>
+    <SimpleModal isOpen={isOpen} onClose={onClose} title="" width="max-w-4xl" noPadding>
       <div className="grid lg:grid-cols-5">
         <ModalLeftPanel
           title={`Set up ${domainName}`}
@@ -57,29 +119,39 @@ export default function SetupGuideModal({ isOpen, onClose, platform, domainName 
 
         <div className="lg:col-span-3 max-h-[80vh] overflow-y-auto p-8">
           {platform === "google_workspace" && (
-            <ol className="space-y-4">
-              <Step n={1} title="Deploy the gateway somewhere with a static outbound IP">
-                A small always-on VM works — it's a long-running TCP listener, not a serverless function. Run it behind TLS if possible; Google supports STARTTLS to the gateway.
-              </Step>
-              <Step n={2} title="Restrict who can talk to it">
-                Set <code className="rounded bg-surface-2 px-1">GATEWAY_ALLOWED_IPS</code> to Google's published outbound-gateway IP ranges for your Workspace instance (shown in the Admin console when you configure step 4). Never leave this empty in production.
-              </Step>
-              <Step n={3} title="Enable Google's SMTP Relay service">
-                Admin console → Apps → Google Workspace → Gmail → Routing → SMTP relay service. Allow-list the gateway's own outbound IP there — this lets it hand mail back to Google for final delivery without needing its own SPF/DKIM setup. No DNS changes required for this step.
-              </Step>
-              <Step n={4} title="Configure the Outbound Gateway">
-                Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at your gateway's public host:port. Start scoped to a single test OU, not the whole org.
-              </Step>
-              <Step n={5} title="Send a real test message">
-                From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.
-              </Step>
-              <Step n={6} title="Widen the OU scope gradually">
-                Watch gateway logs for errors as you roll out to more of the domain.
-              </Step>
-              <Step n={7} title="Add the SPF/DKIM records">
-                Turn on DKIM signing in Admin console → Apps → Google Workspace → Gmail → Authenticate email, then add the TXT record it gives you plus <code className="rounded bg-surface-2 px-1">v=spf1 include:_spf.google.com ~all</code> for SPF.
-              </Step>
-            </ol>
+            <>
+              <div className="mb-4 flex items-center justify-between">
+                <p className="text-xs text-text-lo">
+                  {checked.size} of {GOOGLE_WORKSPACE_STEPS.length} steps checked
+                </p>
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full rounded-full bg-brand-500 transition-all"
+                    style={{ width: `${(checked.size / GOOGLE_WORKSPACE_STEPS.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <ol className="space-y-1">
+                {GOOGLE_WORKSPACE_STEPS.map((step, i) => (
+                  <li key={i}>
+                    <label className="flex cursor-pointer gap-3 rounded-lg p-2 transition-colors hover:bg-surface-2">
+                      <input
+                        type="checkbox"
+                        checked={checked.has(i)}
+                        onChange={() => toggleStep(i)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded"
+                      />
+                      <div>
+                        <p className={`text-sm font-medium ${checked.has(i) ? "text-text-lo line-through" : "text-text-hi"}`}>
+                          {i + 1}. {step.title}
+                        </p>
+                        <div className="mt-0.5 text-xs leading-relaxed text-text-lo">{step.body}</div>
+                      </div>
+                    </label>
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
 
           {platform === "microsoft_365" && (

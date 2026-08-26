@@ -54,26 +54,6 @@ const STATUS_STYLE: Record<Domain["gateway_status"], string> = {
   error: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
 };
 
-interface EditForm {
-  name: string;
-  platform: Domain["platform"];
-  gateway_status: Domain["gateway_status"];
-  spf_verified: boolean;
-  dkim_verified: boolean;
-  notes: string;
-}
-
-function toEditForm(domain: Domain): EditForm {
-  return {
-    name: domain.name,
-    platform: domain.platform,
-    gateway_status: domain.gateway_status,
-    spf_verified: domain.spf_verified,
-    dkim_verified: domain.dkim_verified,
-    notes: domain.notes || "",
-  };
-}
-
 export default function DomainsPage() {
   return (
     <Suspense fallback={null}>
@@ -90,10 +70,8 @@ function DomainsPageInner() {
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Domain["platform"]>("google_workspace");
   const [adding, setAdding] = useState(false);
-  const [editTarget, setEditTarget] = useState<Domain | null>(null);
-  const [editForm, setEditForm] = useState<EditForm | null>(null);
-  const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Domain | null>(null);
+  const [patchingId, setPatchingId] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<Set<string>>(new Set());
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
   const [guideTarget, setGuideTarget] = useState<Domain | null>(null);
@@ -140,32 +118,23 @@ function DomainsPageInner() {
     load();
   };
 
-  const openEdit = (domain: Domain) => {
-    setEditTarget(domain);
-    setEditForm(toEditForm(domain));
-  };
-
-  const saveEdit = async () => {
-    if (!editTarget || !editForm) return;
-    setSaving(true);
-    const res = await fetch(`/api/domains/${editTarget.id}`, {
+  const patchDomain = async (domain: Domain, patch: Partial<Pick<Domain, "platform" | "gateway_status" | "notes">>) => {
+    setPatchingId(domain.id);
+    // Optimistic update so the inline control feels immediate.
+    setDomains((prev) => prev.map((d) => (d.id === domain.id ? { ...d, ...patch } : d)));
+    const res = await fetch(`/api/domains/${domain.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        platform: editForm.platform,
-        gateway_status: editForm.gateway_status,
-        notes: editForm.notes.trim() || null,
-      }),
+      body: JSON.stringify(patch),
     });
-    setSaving(false);
+    setPatchingId(null);
     if (!res.ok) {
-      toast.error("Failed to save domain");
+      toast.error("Failed to update domain");
+      load(); // revert the optimistic update to whatever's actually saved
       return;
     }
-    toast.success("Domain updated");
-    setEditTarget(null);
-    setEditForm(null);
-    load();
+    const { domain: updated } = await res.json();
+    setDomains((prev) => prev.map((d) => (d.id === domain.id ? updated : d)));
   };
 
   const deleteDomain = async () => {
@@ -232,26 +201,40 @@ function DomainsPageInner() {
             <div className="mb-3 flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate font-display text-lg font-semibold text-text-hi">{domain.name}</p>
-                <p className="flex items-center gap-1.5 text-sm text-text-lo">
-                  {PLATFORM_LABEL[domain.platform]}
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={domain.platform}
+                    onChange={(e) => patchDomain(domain, { platform: e.target.value as Domain["platform"] })}
+                    disabled={patchingId === domain.id}
+                    className="-ml-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-sm text-text-lo outline-none transition-colors hover:border-app-border focus:border-app-border focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                  >
+                    <option value="google_workspace">{PLATFORM_LABEL.google_workspace}</option>
+                    <option value="microsoft_365">{PLATFORM_LABEL.microsoft_365}</option>
+                    <option value="other">{PLATFORM_LABEL.other}</option>
+                  </select>
                   {verifyResults[domain.id]?.provider && (
                     <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-text-lo">
                       DNS: {verifyResults[domain.id].provider}
                     </span>
                   )}
-                </p>
+                </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[domain.gateway_status]}`}>
-                  {domain.gateway_status.replace("_", " ")}
-                </span>
-                <button
-                  onClick={() => openEdit(domain)}
-                  className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
-                  title="Edit domain"
+                <select
+                  value={domain.gateway_status}
+                  onChange={(e) => patchDomain(domain, { gateway_status: e.target.value as Domain["gateway_status"] })}
+                  disabled={patchingId === domain.id}
+                  className={`rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none disabled:opacity-50 ${STATUS_STYLE[domain.gateway_status]}`}
+                  title={domain.gateway_status === "active" ? "Set automatically — can be reverted, not set manually" : "Gateway status"}
                 >
-                  <Icon icon="solar:pen-broken" className="h-4 w-4" />
-                </button>
+                  {(Object.keys(GATEWAY_STATUS_LABEL) as Domain["gateway_status"][])
+                    .filter((s) => s !== "active" || domain.gateway_status === "active")
+                    .map((s) => (
+                      <option key={s} value={s}>
+                        {GATEWAY_STATUS_LABEL[s]}
+                      </option>
+                    ))}
+                </select>
                 <button
                   onClick={() => setDeleteTarget(domain)}
                   className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-status-danger/10 hover:text-status-danger"
@@ -262,7 +245,16 @@ function DomainsPageInner() {
               </div>
             </div>
 
-            {domain.notes && <p className="mb-3 text-xs text-text-lo">{domain.notes}</p>}
+            <textarea
+              defaultValue={domain.notes || ""}
+              placeholder="+ Add a note (e.g. DNS propagating, ETA Friday)"
+              rows={1}
+              onBlur={(e) => {
+                const value = e.target.value.trim() || null;
+                if (value !== domain.notes) patchDomain(domain, { notes: value });
+              }}
+              className="mb-3 w-full resize-none rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs text-text-lo outline-none transition-colors hover:border-app-border focus:border-app-border focus:ring-1 focus:ring-brand-500"
+            />
 
             <div className="mb-3 flex items-center gap-4 text-xs text-text-lo">
               <span className="flex items-center gap-1">
@@ -377,94 +369,6 @@ function DomainsPageInner() {
         </form>
       </SimpleModal>
 
-      <SimpleModal
-        isOpen={!!editTarget}
-        onClose={() => {
-          setEditTarget(null);
-          setEditForm(null);
-        }}
-        title={`Edit ${editTarget?.name ?? "domain"}`}
-        width="max-w-md"
-      >
-        {editForm && (
-          <div className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
-              <input
-                value={editForm.name}
-                disabled
-                className="w-full rounded-lg border border-app-border bg-surface-2 px-3 py-2 text-sm text-text-lo outline-none"
-              />
-              <p className="mt-1 text-xs text-text-lo">Can't be changed — the name is what verification and platform config are tied to. Delete and re-add if you need a different domain.</p>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Mail platform</label>
-              <select
-                value={editForm.platform}
-                onChange={(e) => setEditForm({ ...editForm, platform: e.target.value as Domain["platform"] })}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="google_workspace">Google Workspace</option>
-                <option value="microsoft_365">Microsoft 365</option>
-                <option value="other">Other / generic SMTP</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Gateway status</label>
-              <select
-                value={editForm.gateway_status}
-                onChange={(e) => setEditForm({ ...editForm, gateway_status: e.target.value as Domain["gateway_status"] })}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                {(Object.keys(GATEWAY_STATUS_LABEL) as Domain["gateway_status"][])
-                  .filter((s) => s !== "active" || editForm.gateway_status === "active")
-                  .map((s) => (
-                    <option key={s} value={s}>
-                      {GATEWAY_STATUS_LABEL[s]}
-                    </option>
-                  ))}
-              </select>
-              <p className="mt-1 text-xs text-text-lo">
-                Active is set automatically on this domain's first successful signature deploy — it can't be set manually, only reverted.
-              </p>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">SPF / DKIM</label>
-              <div className="flex gap-4 rounded-lg border border-app-border bg-surface-2 px-3 py-2">
-                <span className="flex items-center gap-1.5 text-sm text-text-hi">
-                  <Icon
-                    icon={editForm.spf_verified ? "solar:check-circle-bold" : "solar:close-circle-broken"}
-                    className={editForm.spf_verified ? "h-4 w-4 text-emerald-500" : "h-4 w-4 text-text-lo"}
-                  />
-                  SPF {editForm.spf_verified ? "verified" : "not verified"}
-                </span>
-                <span className="flex items-center gap-1.5 text-sm text-text-hi">
-                  <Icon
-                    icon={editForm.dkim_verified ? "solar:check-circle-bold" : "solar:close-circle-broken"}
-                    className={editForm.dkim_verified ? "h-4 w-4 text-emerald-500" : "h-4 w-4 text-text-lo"}
-                  />
-                  DKIM {editForm.dkim_verified ? "verified" : "not verified"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-text-lo">Read-only — these can only be set by running "Verify DNS" on the domain card, so they always reflect a real lookup.</p>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-text-hi">Notes</label>
-              <textarea
-                value={editForm.notes}
-                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                placeholder="e.g. DNS propagating, ETA Friday"
-                rows={3}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <Button className="w-full" onClick={saveEdit} disabled={saving}>
-              {saving ? "Saving..." : "Save changes"}
-            </Button>
-          </div>
-        )}
-      </SimpleModal>
-
       <ConfirmDialog
         isOpen={!!deleteTarget}
         title="Delete domain?"
@@ -483,6 +387,7 @@ function DomainsPageInner() {
           isOpen={!!guideTarget}
           onClose={() => setGuideTarget(null)}
           platform={guideTarget.platform}
+          domainId={guideTarget.id}
           domainName={guideTarget.name}
         />
       )}

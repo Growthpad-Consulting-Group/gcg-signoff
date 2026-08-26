@@ -304,6 +304,8 @@ function DomainsPageInner() {
                 domainId={domain.id}
                 connected={!!domain.cloudflare_zone_id}
                 detectedProvider={verifyResults[domain.id]?.provider ?? null}
+                spfVerified={domain.spf_verified}
+                dkimVerified={domain.dkim_verified}
                 onChanged={load}
               />
             </div>

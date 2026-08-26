@@ -10,10 +10,12 @@ interface CloudflareSectionProps {
   domainId: string;
   connected: boolean;
   detectedProvider: string | null;
+  spfVerified: boolean;
+  dkimVerified: boolean;
   onChanged: () => void;
 }
 
-export default function CloudflareSection({ domainId, connected, detectedProvider, onChanged }: CloudflareSectionProps) {
+export default function CloudflareSection({ domainId, connected, detectedProvider, spfVerified, dkimVerified, onChanged }: CloudflareSectionProps) {
   const [showConnect, setShowConnect] = useState(false);
   const [apiToken, setApiToken] = useState("");
   const [connecting, setConnecting] = useState(false);
@@ -85,6 +87,10 @@ export default function CloudflareSection({ domainId, connected, detectedProvide
     onChanged();
   };
 
+  // Nothing to apply — SPF and DKIM already resolve correctly, so don't dangle an "auto-apply"
+  // offer that would have nothing to actually change.
+  if (spfVerified && dkimVerified && !connected) return null;
+
   if (!connected) {
     return (
       <>
@@ -139,37 +145,50 @@ export default function CloudflareSection({ domainId, connected, detectedProvide
         </button>
       </div>
 
-      <button
-        onClick={applySpf}
-        disabled={applyingSpf}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
-      >
-        {applyingSpf ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:magic-stick-3-broken" className="h-3.5 w-3.5" />}
-        Apply SPF record
-      </button>
+      {spfVerified && dkimVerified ? (
+        <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+          <Icon icon="solar:check-circle-broken" className="h-3.5 w-3.5" />
+          SPF and DKIM already resolve correctly — nothing to apply.
+        </p>
+      ) : (
+        <>
+          {!spfVerified && (
+            <button
+              onClick={applySpf}
+              disabled={applyingSpf}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
+            >
+              {applyingSpf ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:magic-stick-3-broken" className="h-3.5 w-3.5" />}
+              Apply SPF record
+            </button>
+          )}
 
-      <div className="flex flex-col gap-1.5 sm:flex-row">
-        <input
-          value={dkimName}
-          onChange={(e) => setDkimName(e.target.value)}
-          placeholder="Record name (e.g. google._domainkey)"
-          className="flex-1 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <input
-          value={dkimValue}
-          onChange={(e) => setDkimValue(e.target.value)}
-          placeholder="DKIM value from Google Admin"
-          className="flex-1 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <button
-          onClick={applyDkim}
-          disabled={!dkimName.trim() || !dkimValue.trim() || applyingDkim}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
-        >
-          {applyingDkim ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:magic-stick-3-broken" className="h-3.5 w-3.5" />}
-          Apply DKIM
-        </button>
-      </div>
+          {!dkimVerified && (
+            <div className="flex flex-col gap-1.5 sm:flex-row">
+              <input
+                value={dkimName}
+                onChange={(e) => setDkimName(e.target.value)}
+                placeholder="Record name (e.g. google._domainkey)"
+                className="flex-1 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <input
+                value={dkimValue}
+                onChange={(e) => setDkimValue(e.target.value)}
+                placeholder="DKIM value from Google Admin"
+                className="flex-1 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                onClick={applyDkim}
+                disabled={!dkimName.trim() || !dkimValue.trim() || applyingDkim}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
+              >
+                {applyingDkim ? <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="solar:magic-stick-3-broken" className="h-3.5 w-3.5" />}
+                Apply DKIM
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

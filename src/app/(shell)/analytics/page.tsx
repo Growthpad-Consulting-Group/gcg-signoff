@@ -49,8 +49,9 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetch("/api/campaigns/analytics")
-      .then((r) => r.json())
-      .then(setData);
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("request failed"))))
+      .then(setData)
+      .catch(() => setData({ totals: { impressions: 0, clicks: 0 }, series: [], campaigns: [], experiments: [] }));
   }, []);
 
   const ctr = data && data.totals.impressions > 0 ? ((data.totals.clicks / data.totals.impressions) * 100).toFixed(1) : "0.0";

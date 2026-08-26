@@ -14,7 +14,7 @@ export default function CampaignSummary() {
 
   useEffect(() => {
     fetch("/api/campaigns/analytics")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("request failed"))))
       .then(setData)
       .catch(() => setData({ totals: { impressions: 0, clicks: 0 }, campaigns: [] }));
   }, []);

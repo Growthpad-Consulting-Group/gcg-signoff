@@ -4,9 +4,9 @@ import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  // `name` is immutable after creation (see Domains page) — never write it here even if a
-  // stale client payload includes it.
-  const { name: _ignoredName, ...rest } = body;
+  // `name` is immutable after creation (see Domains page); the Cloudflare token/zone are only
+  // ever set via the dedicated connect/disconnect routes, never this generic passthrough.
+  const { name: _ignoredName, cloudflare_api_token_encrypted: _ignoredToken, cloudflare_zone_id: _ignoredZone, ...rest } = body;
   const supabase = createServerSupabaseClient();
 
   const update: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from("domains")
     .update(update)
     .eq("id", id)
-    .select("*")
+    .select("id, name, platform, gateway_status, spf_verified, dkim_verified, notes, cloudflare_zone_id, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

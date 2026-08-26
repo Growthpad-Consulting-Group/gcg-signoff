@@ -23,7 +23,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .from("domains")
     .update({ spf_verified: spf.found, dkim_verified: dkim.found, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select("*")
+    .select("id, name, platform, gateway_status, spf_verified, dkim_verified, notes, cloudflare_zone_id, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

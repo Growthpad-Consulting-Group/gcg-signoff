@@ -5,7 +5,12 @@ export async function GET() {
   const supabase = createServerSupabaseClient();
 
   const [{ data: domains, error }, { data: staff, error: staffError }] = await Promise.all([
-    supabase.from("domains").select("*").order("created_at", { ascending: false }),
+    // Excludes cloudflare_api_token_encrypted deliberately — never send it to the client, even
+    // as ciphertext. cloudflare_zone_id is fine (not secret) and doubles as a "connected" marker.
+    supabase
+      .from("domains")
+      .select("id, name, platform, gateway_status, spf_verified, dkim_verified, notes, cloudflare_zone_id, created_at, updated_at")
+      .order("created_at", { ascending: false }),
     supabase.from("staff").select("domain_id"),
   ]);
 
@@ -30,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { data: domain, error } = await supabase
     .from("domains")
     .insert({ name, platform: platform || "google_workspace" })
-    .select("*")
+    .select("id, name, platform, gateway_status, spf_verified, dkim_verified, notes, cloudflare_zone_id, created_at, updated_at")
     .single();
 
   if (error) {

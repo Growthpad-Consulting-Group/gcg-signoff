@@ -10,6 +10,7 @@ import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button from "@/shared/ui/Button";
 import GenericEmptyState from "@/shared/ui/EmptyState";
 import SetupGuideModal from "@/features/domains/ui/SetupGuideModal";
+import CloudflareSection from "@/features/domains/ui/CloudflareSection";
 
 interface Domain {
   id: string;
@@ -19,6 +20,7 @@ interface Domain {
   spf_verified: boolean;
   dkim_verified: boolean;
   notes: string | null;
+  cloudflare_zone_id: string | null;
 }
 
 const PLATFORM_LABEL: Record<Domain["platform"], string> = {
@@ -296,6 +298,15 @@ function DomainsPageInner() {
                 </p>
               </div>
             )}
+
+            <div className="mb-3">
+              <CloudflareSection
+                domainId={domain.id}
+                connected={!!domain.cloudflare_zone_id}
+                detectedProvider={verifyResults[domain.id]?.provider ?? null}
+                onChanged={load}
+              />
+            </div>
 
             {domain.gateway_status !== "active" && (
               <div className="rounded-lg border border-dashed border-app-border p-2.5">

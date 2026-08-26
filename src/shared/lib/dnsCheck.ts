@@ -8,7 +8,7 @@ const SPF_INCLUDE_BY_PLATFORM: Record<MailPlatform, string | null> = {
   other: null,
 };
 
-const EXPECTED_SPF_BY_PLATFORM: Record<MailPlatform, string> = {
+export const EXPECTED_SPF_BY_PLATFORM: Record<MailPlatform, string> = {
   google_workspace: "v=spf1 include:_spf.google.com ~all",
   microsoft_365: "v=spf1 include:spf.protection.outlook.com -all",
   other: "v=spf1 include:<your relay's SPF include> ~all",

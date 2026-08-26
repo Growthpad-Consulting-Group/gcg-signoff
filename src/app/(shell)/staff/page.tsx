@@ -24,6 +24,17 @@ interface Assignment {
   template_id: string;
   deploy_status: "pending" | "deployed" | "error";
   last_deployed_at: string | null;
+  updated_at: string;
+}
+
+// A "pending" assignment older than this has likely gone unnoticed rather than just be waiting
+// on the person's next outgoing email — surface it instead of leaving it silently stuck.
+const STUCK_PENDING_HOURS = 24;
+
+function isStuckPending(assignment: Assignment | null): boolean {
+  if (!assignment || assignment.deploy_status !== "pending") return false;
+  const ageMs = Date.now() - new Date(assignment.updated_at).getTime();
+  return ageMs > STUCK_PENDING_HOURS * 60 * 60 * 1000;
 }
 
 interface Staff {
@@ -243,6 +254,7 @@ export default function StaffPage() {
                 const assignment = assignmentOf(person);
                 const domain = domainById.get(person.domain_id);
                 const domainInactive = domain && domain.gateway_status !== "active";
+                const stuck = isStuckPending(assignment);
                 return (
                   <tr key={person.id} className="border-b border-app-border last:border-0">
                     <td className="px-4 py-3">
@@ -285,7 +297,12 @@ export default function StaffPage() {
                             <Icon icon="solar:danger-triangle-broken" className="h-4 w-4 text-amber-500" />
                           </span>
                         )}
-                        {assignment?.deploy_status === "error" && (
+                        {stuck && (
+                          <span title={`Pending for over ${STUCK_PENDING_HOURS}h — the gateway may not be picking this up.`}>
+                            <Icon icon="solar:clock-circle-broken" className="h-4 w-4 text-amber-500" />
+                          </span>
+                        )}
+                        {(assignment?.deploy_status === "error" || stuck) && (
                           <button
                             onClick={() => retryDeploy(person.id)}
                             disabled={retryingId === person.id}

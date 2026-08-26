@@ -9,6 +9,7 @@ import { CSS } from "@dnd-kit/utilities";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
 import GenericEmptyState from "@/shared/ui/EmptyState";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { DEFAULT_TEMPLATE_HTML } from "@/features/signatures/lib/defaultTemplate";
 
 interface Template {
@@ -140,6 +141,7 @@ export default function TemplatesPage() {
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Template | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("manual");
   const router = useRouter();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,8 +184,7 @@ export default function TemplatesPage() {
     load();
   };
 
-  const deleteTemplate = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? Staff assigned to it will need a new template.`)) return;
+  const deleteTemplate = async (id: string) => {
     const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
     if (!res.ok) {
       toast.error("Failed to delete template");
@@ -191,6 +192,7 @@ export default function TemplatesPage() {
     }
     toast.success("Template deleted");
     setTemplates((prev) => prev.filter((t) => t.id !== id));
+    setDeleteTarget(null);
   };
 
   const persistOrder = (ordered: Template[]) => {
@@ -289,12 +291,23 @@ export default function TemplatesPage() {
                 dragDisabled={!dragEnabled}
                 onOpen={() => router.push(`/templates/${template.id}`)}
                 onDuplicate={() => duplicateTemplate(template.id)}
-                onDelete={() => deleteTemplate(template.id, template.name)}
+                onDelete={() => setDeleteTarget(template)}
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        title="Delete template?"
+        message={`Delete "${deleteTarget?.name}"? Staff assigned to it will need a new template.`}
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteTarget) await deleteTemplate(deleteTarget.id);
+        }}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

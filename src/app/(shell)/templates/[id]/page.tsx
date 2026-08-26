@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import GrapesEditor, { GrapesEditorHandle } from "@/features/signatures/ui/GrapesEditor";
 
@@ -45,6 +46,7 @@ export default function TemplateEditorPage() {
   const [previewAsId, setPreviewAsId] = useState<string>("");
   const [testEmail, setTestEmail] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<GrapesEditorHandle>(null);
@@ -127,7 +129,6 @@ export default function TemplateEditorPage() {
   }, [name, description]);
 
   const deleteTemplate = async () => {
-    if (!confirm(`Delete "${name}"? Staff assigned to it will need a new template.`)) return;
     const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
     if (!res.ok) {
       toast.error("Failed to delete template");
@@ -164,7 +165,7 @@ export default function TemplateEditorPage() {
         title={name || "Untitled template"}
         description="Drag, drop, and edit visually — merge tags render with each staff member's own details."
         icon="solar:pen-new-square-broken"
-        actions={[{ label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: deleteTemplate, className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" }]}
+        actions={[{ label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: () => setShowDeleteConfirm(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" }]}
         saveAction={{ onSave: save, loading: saving, label: "Save template" }}
       />
 
@@ -289,6 +290,15 @@ export default function TemplateEditorPage() {
           {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."} Send a test to see how it looks in an actual inbox.
         </p>
       </div>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete template?"
+        message={`Delete "${name}"? Staff assigned to it will need a new template.`}
+        confirmLabel="Delete"
+        onConfirm={deleteTemplate}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

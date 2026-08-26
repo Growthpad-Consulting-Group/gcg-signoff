@@ -43,7 +43,6 @@ export default function TemplateEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
   const [previewAsId, setPreviewAsId] = useState<string>("");
   const [testEmail, setTestEmail] = useState("");
@@ -220,26 +219,10 @@ export default function TemplateEditorPage() {
       </div>
 
       <div className="mb-2 flex items-center justify-between">
-        <div className="inline-flex rounded-lg border border-app-border bg-surface p-1">
-          <button
-            onClick={() => setActiveTab("edit")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "edit" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
-            }`}
-          >
-            <Icon icon="solar:widget-broken" className="h-4 w-4" />
-            Edit
-          </button>
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "preview" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
-            }`}
-          >
-            <Icon icon="solar:eye-broken" className="h-4 w-4" />
-            Preview
-          </button>
-        </div>
+        <span className="flex items-center gap-1.5 text-sm font-medium text-text-hi">
+          <Icon icon="solar:widget-broken" className="h-4 w-4" />
+          Editor
+        </span>
         {autosaveStatus !== "idle" && (
           <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
             {autosaveStatus === "saving" ? (
@@ -257,32 +240,35 @@ export default function TemplateEditorPage() {
         )}
       </div>
 
-      {/* Both stay mounted — toggling GrapesJS in and out of the DOM would destroy its editor
-          state, so only visibility switches between tabs. */}
-      <div className={activeTab === "edit" ? "" : "hidden"}>
-        <div className="overflow-hidden rounded-lg border border-app-border">
-          <GrapesEditor
-            key={editorKey}
-            ref={editorRef}
-            initialHtml={initialHtml}
-            initialProjectData={initialProjectData}
-            onChange={(html) => {
-              setPreviewHtml(html);
-              scheduleAutosave();
-            }}
-          />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <div className="overflow-hidden rounded-lg border border-app-border">
+            <GrapesEditor
+              key={editorKey}
+              ref={editorRef}
+              initialHtml={initialHtml}
+              initialProjectData={initialProjectData}
+              onChange={(html) => {
+                setPreviewHtml(html);
+                scheduleAutosave();
+              }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-text-lo">
+            Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
+          </p>
         </div>
-        <p className="mt-1 text-xs text-text-lo">
-          Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
-        </p>
-      </div>
 
-      <div className={activeTab === "preview" ? "" : "hidden"}>
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col lg:col-span-2">
+          <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-text-hi">
+            <Icon icon="solar:eye-broken" className="h-4 w-4" />
+            Live preview
+          </div>
+
           <select
             value={previewAsId}
             onChange={(e) => setPreviewAsId(e.target.value)}
-            className="rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            className="mb-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="">Sample data (Jane Wanjiru)</option>
             {staffOptions.map((s) => (
@@ -292,7 +278,53 @@ export default function TemplateEditorPage() {
             ))}
           </select>
 
-          <div className="flex flex-1 items-center gap-2">
+          <div className="mb-2 flex items-center gap-1.5">
+            <button
+              onClick={() => setPreviewDark((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                previewDark ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
+              }`}
+            >
+              <Icon icon="solar:moon-broken" className="h-3.5 w-3.5" />
+              Dark
+            </button>
+            <button
+              onClick={() => setPreviewMobile((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                previewMobile ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
+              }`}
+            >
+              <Icon icon="solar:smartphone-broken" className="h-3.5 w-3.5" />
+              Mobile
+            </button>
+          </div>
+
+          <div className={`mx-auto w-full flex-1 overflow-auto rounded-lg border border-app-border p-4 transition-all ${previewDark ? "bg-gray-900" : "bg-white"} ${previewMobile ? "max-w-[375px]" : ""}`} style={{ minHeight: 300 }}>
+            <div className={previewDark ? "text-white" : "text-black"} dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
+          </div>
+          <p className="mb-2 mt-1 text-xs text-text-lo">
+            {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."}
+          </p>
+
+          <div className={`mb-2 rounded-lg border p-2.5 text-xs ${lintFindings.length === 0 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/10" : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10"}`}>
+            {lintFindings.length === 0 ? (
+              <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <Icon icon="solar:check-circle-broken" className="h-3.5 w-3.5 shrink-0" />
+                No compatibility or accessibility issues found.
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {lintFindings.map((f, i) => (
+                  <li key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                    <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {f.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
             <input
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
@@ -313,52 +345,6 @@ export default function TemplateEditorPage() {
             </button>
           </div>
         </div>
-
-        <div className="mb-3 flex items-center gap-2">
-          <button
-            onClick={() => setPreviewDark((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              previewDark ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
-            }`}
-          >
-            <Icon icon="solar:moon-broken" className="h-3.5 w-3.5" />
-            Dark background
-          </button>
-          <button
-            onClick={() => setPreviewMobile((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              previewMobile ? "border-brand-500 bg-brand-500/10 text-brand-600" : "border-app-border bg-surface text-text-lo hover:text-text-hi"
-            }`}
-          >
-            <Icon icon="solar:smartphone-broken" className="h-3.5 w-3.5" />
-            Mobile width
-          </button>
-        </div>
-
-        <div className={`rounded-lg border p-3 text-sm ${lintFindings.length === 0 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/10" : "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10"} mb-3`}>
-          {lintFindings.length === 0 ? (
-            <p className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-              <Icon icon="solar:check-circle-broken" className="h-4 w-4 shrink-0" />
-              No compatibility or accessibility issues found.
-            </p>
-          ) : (
-            <ul className="space-y-1.5">
-              {lintFindings.map((f, i) => (
-                <li key={i} className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                  <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0" />
-                  {f.message}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className={`mx-auto h-[540px] overflow-auto rounded-lg border border-app-border p-4 transition-all ${previewDark ? "bg-gray-900" : "bg-white"} ${previewMobile ? "max-w-[375px]" : ""}`}>
-          <div className={previewDark ? "text-white" : "text-black"} dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
-        </div>
-        <p className="mt-1 text-xs text-text-lo">
-          {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."} Send a test to see how it looks in an actual inbox.
-        </p>
       </div>
 
       <ConfirmDialog

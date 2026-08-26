@@ -181,7 +181,13 @@ function StaffFormFields({
           <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
           <select
             value={form.domain_id}
-            onChange={(e) => setForm((f) => ({ ...f, domain_id: e.target.value }))}
+            onChange={(e) => {
+              const newDomain = domains.find((d) => d.id === e.target.value);
+              setForm((f) => {
+                const localPart = f.email.includes("@") ? f.email.slice(0, f.email.indexOf("@")) : f.email;
+                return { ...f, domain_id: e.target.value, email: newDomain && localPart ? `${localPart}@${newDomain.name}` : f.email };
+              });
+            }}
             className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
           >
             <option value="" disabled>
@@ -212,12 +218,24 @@ function StaffFormFields({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-hi">Email</label>
-          <input
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            placeholder={selectedDomain ? `name@${selectedDomain.name}` : "name@yourcompany.com"}
-            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          {selectedDomain ? (
+            <div className="flex items-stretch overflow-hidden rounded-lg border border-app-border bg-surface focus-within:ring-2 focus-within:ring-brand-500">
+              <input
+                value={form.email.endsWith(`@${selectedDomain.name}`) ? form.email.slice(0, -(selectedDomain.name.length + 1)) : form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: `${e.target.value}@${selectedDomain.name}` }))}
+                placeholder="jane.wanjiru"
+                className="w-full min-w-0 bg-transparent px-3 py-2 text-sm text-text-hi outline-none"
+              />
+              <span className="flex shrink-0 items-center bg-surface-2 px-3 text-sm text-text-lo">@{selectedDomain.name}</span>
+            </div>
+          ) : (
+            <input
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="name@yourcompany.com"
+              className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-hi">Role / title</label>

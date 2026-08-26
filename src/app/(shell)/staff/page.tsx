@@ -322,6 +322,7 @@ function StaffPageInner() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
   const router = useRouter();
+  const handledNewParam = useRef(false);
   const searchParams = useSearchParams();
 
   const [form, setForm] = useState<StaffForm>(EMPTY_FORM);
@@ -344,7 +345,8 @@ function StaffPageInner() {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("new") === "1") {
+    if (searchParams.get("new") === "1" && !handledNewParam.current) {
+      handledNewParam.current = true;
       router.replace("/staff");
       setShowAdd(true);
     }

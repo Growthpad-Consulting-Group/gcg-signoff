@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
@@ -76,6 +76,7 @@ function DomainsPageInner() {
   const [verifyResults, setVerifyResults] = useState<Record<string, VerifyResult>>({});
   const [guideTarget, setGuideTarget] = useState<Domain | null>(null);
   const router = useRouter();
+  const handledNewParam = useRef(false);
   const searchParams = useSearchParams();
 
   const load = async () => {
@@ -91,7 +92,8 @@ function DomainsPageInner() {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("new") === "1") {
+    if (searchParams.get("new") === "1" && !handledNewParam.current) {
+      handledNewParam.current = true;
       router.replace("/domains");
       setShowAdd(true);
     }

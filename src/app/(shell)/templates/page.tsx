@@ -154,6 +154,7 @@ function TemplatesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledNewParam = useRef(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -186,7 +187,8 @@ function TemplatesPageInner() {
   // Dashboard "New template" quick action deep-links here with ?new=1 instead of a modal, since
   // this page creates immediately and navigates rather than showing an Add form.
   useEffect(() => {
-    if (searchParams.get("new") === "1") {
+    if (searchParams.get("new") === "1" && !handledNewParam.current) {
+      handledNewParam.current = true;
       router.replace("/templates");
       createTemplate();
     }

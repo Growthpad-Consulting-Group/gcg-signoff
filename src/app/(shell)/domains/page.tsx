@@ -152,7 +152,6 @@ function DomainsPageInner() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: editForm.name.trim(),
         platform: editForm.platform,
         gateway_status: editForm.gateway_status,
         notes: editForm.notes.trim() || null,
@@ -393,9 +392,10 @@ function DomainsPageInner() {
               <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
               <input
                 value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+                disabled
+                className="w-full rounded-lg border border-app-border bg-surface-2 px-3 py-2 text-sm text-text-lo outline-none"
               />
+              <p className="mt-1 text-xs text-text-lo">Can't be changed — the name is what verification and platform config are tied to. Delete and re-add if you need a different domain.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-hi">Mail platform</label>
@@ -416,14 +416,16 @@ function DomainsPageInner() {
                 onChange={(e) => setEditForm({ ...editForm, gateway_status: e.target.value as Domain["gateway_status"] })}
                 className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
               >
-                {(Object.keys(GATEWAY_STATUS_LABEL) as Domain["gateway_status"][]).map((s) => (
-                  <option key={s} value={s}>
-                    {GATEWAY_STATUS_LABEL[s]}
-                  </option>
-                ))}
+                {(Object.keys(GATEWAY_STATUS_LABEL) as Domain["gateway_status"][])
+                  .filter((s) => s !== "active" || editForm.gateway_status === "active")
+                  .map((s) => (
+                    <option key={s} value={s}>
+                      {GATEWAY_STATUS_LABEL[s]}
+                    </option>
+                  ))}
               </select>
               <p className="mt-1 text-xs text-text-lo">
-                This normally flips to Active automatically on this domain's first successful signature deploy — only override it here for a manual exception.
+                Active is set automatically on this domain's first successful signature deploy — it can't be set manually, only reverted.
               </p>
             </div>
             <div>

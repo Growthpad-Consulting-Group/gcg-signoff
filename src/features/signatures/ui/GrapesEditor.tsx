@@ -77,8 +77,12 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
         }, 500);
       });
 
-      // Fire once immediately so the live preview reflects the initial content right away.
-      onChangeRef.current(editor.getHtml(), editor.getCss() || "", editor.getProjectData());
+      // `init()` returns before the canvas iframe has actually finished loading — calling
+      // getHtml() synchronously here can race ahead of that and return empty/partial content.
+      // Wait for GrapesJS's own "load" event instead of firing immediately.
+      editor.on("load", () => {
+        onChangeRef.current(editor.getHtml(), editor.getCss() || "", editor.getProjectData());
+      });
     })();
 
     return () => {

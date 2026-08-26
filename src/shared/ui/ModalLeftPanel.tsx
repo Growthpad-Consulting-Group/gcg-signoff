@@ -174,7 +174,8 @@ export const StepIndicator: React.FC<{
     }>;
     currentStep: number;
     variant?: 'vertical' | 'horizontal';
-}> = ({ steps, currentStep, variant = 'vertical' }) => {
+    onStepClick?: (number: number) => void;
+}> = ({ steps, currentStep, variant = 'vertical', onStepClick }) => {
     const isVertical = variant === 'vertical';
 
     return (
@@ -186,7 +187,8 @@ export const StepIndicator: React.FC<{
                 return (
                     <div
                         key={step.number}
-                        className={`flex ${isVertical ? 'flex-row' : 'flex-col'} items-center gap-3`}
+                        onClick={onStepClick ? () => onStepClick(step.number) : undefined}
+                        className={`flex ${isVertical ? 'flex-row' : 'flex-col'} items-center gap-3 ${onStepClick ? 'cursor-pointer' : ''}`}
                     >
                         <div className={`
                             w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all

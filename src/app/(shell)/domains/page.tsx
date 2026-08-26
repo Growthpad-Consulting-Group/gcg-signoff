@@ -75,6 +75,7 @@ function DomainsPageInner() {
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Domain["platform"]>("google_workspace");
+  const [adding, setAdding] = useState(false);
   const [editTarget, setEditTarget] = useState<Domain | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -103,14 +104,17 @@ function DomainsPageInner() {
   }, [searchParams]);
 
   const addDomain = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || adding) return;
+    setAdding(true);
     const res = await fetch("/api/domains", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: name.trim(), platform }),
     });
+    setAdding(false);
     if (!res.ok) {
-      toast.error("Failed to add domain");
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to add domain");
       return;
     }
     toast.success("Domain added");
@@ -232,13 +236,20 @@ function DomainsPageInner() {
       </div>
 
       <SimpleModal isOpen={showAdd} onClose={() => setShowAdd(false)} title="Add domain" width="max-w-md">
-        <div className="space-y-4">
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            addDomain();
+          }}
+        >
           <div>
             <label className="mb-1 block text-sm font-medium text-text-hi">Domain</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="growthpad.co.ke"
+              autoFocus
               className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -257,10 +268,10 @@ function DomainsPageInner() {
               Determines how signatures get deployed: Workspace uses an Outbound Gateway, M365 uses a transport rule, others need a relay.
             </p>
           </div>
-          <Button className="w-full" onClick={addDomain}>
-            Add domain
+          <Button type="submit" className="w-full" disabled={!name.trim() || adding}>
+            {adding ? "Adding…" : "Add domain"}
           </Button>
-        </div>
+        </form>
       </SimpleModal>
 
       <SimpleModal

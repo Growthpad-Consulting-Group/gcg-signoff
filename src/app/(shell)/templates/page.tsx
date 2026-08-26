@@ -82,6 +82,7 @@ export default function TemplatesPage() {
   const [sortBy, setSortBy] = useState<SortBy>("manual");
   const router = useRouter();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didDragRef = useRef(false);
 
   const load = async () => {
     setLoading(true);
@@ -215,7 +216,16 @@ export default function TemplatesPage() {
             key={template.id}
             value={template}
             drag={sortBy === "manual"}
-            onClick={() => router.push(`/templates/${template.id}`)}
+            onDragStart={() => {
+              didDragRef.current = true;
+            }}
+            onClick={() => {
+              if (didDragRef.current) {
+                didDragRef.current = false;
+                return;
+              }
+              router.push(`/templates/${template.id}`);
+            }}
             className="flex cursor-pointer flex-col rounded-2xl border border-app-border bg-surface p-4 text-left shadow-sm transition-colors hover:bg-surface-2"
           >
             <div className="mb-3 overflow-hidden rounded-lg border border-app-border bg-white p-3">

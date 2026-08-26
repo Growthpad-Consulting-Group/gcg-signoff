@@ -22,6 +22,8 @@ export const sidebarNavGroups: NavGroup[] = [
     items: [
       { href: "/templates", icon: "solar:pen-new-square-broken", label: "Templates" },
       { href: "/staff", icon: "solar:users-group-rounded-broken", label: "Staff" },
+      { href: "/campaigns", icon: "solar:megaphone-broken", label: "Campaigns" },
+      { href: "/analytics", icon: "solar:chart-broken", label: "Analytics" },
     ],
   },
   {

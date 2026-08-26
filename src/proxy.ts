@@ -13,6 +13,8 @@ export async function proxy(req: NextRequest) {
     // with their own RENDER_API_SECRET check instead of a session cookie.
     pathname.startsWith("/api/render") ||
     pathname.startsWith("/api/deploy-status") ||
+    // Hit directly from a recipient's email client clicking a campaign banner — no session.
+    /^\/api\/campaigns\/[^/]+\/click$/.test(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||

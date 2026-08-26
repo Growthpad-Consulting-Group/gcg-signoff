@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
 import { renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import { sendEmail } from "@/shared/lib/mailer";
+import { campaignClickUrl, getActiveCampaignsForDomain, pickWeighted, renderBannerHtml } from "@/features/campaigns/lib/selectCampaign";
 
 const SAMPLE_STAFF = {
   full_name: "Jane Wanjiru",
@@ -23,16 +24,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
 
   let staffData = SAMPLE_STAFF;
+  let domainId: string | null = null;
   if (staffId) {
     const { data: staff } = await supabase
       .from("staff")
-      .select("full_name, email, role_title, department, phone, mobile, photo_url")
+      .select("full_name, email, role_title, department, phone, mobile, photo_url, domain_id")
       .eq("id", staffId)
       .maybeSingle();
-    if (staff) staffData = staff;
+    if (staff) {
+      staffData = staff;
+      domainId = staff.domain_id;
+    }
   }
 
-  const html = renderSignatureHtml(template.html, staffData);
+  let html = renderSignatureHtml(template.html, staffData);
+
+  // Shows the banner a real send would carry (if any), but never counts as an impression —
+  // a test send isn't a real outgoing email and shouldn't skew analytics.
+  if (domainId) {
+    const campaign = pickWeighted(await getActiveCampaignsForDomain(domainId));
+    if (campaign) html += renderBannerHtml(campaign, campaignClickUrl(campaign.id, staffId));
+  }
 
   try {
     await sendEmail({ to, subject: `Signature preview: ${template.name}`, html });

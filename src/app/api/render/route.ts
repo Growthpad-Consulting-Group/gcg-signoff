@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/shared/lib/supabase/server";
 import { renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
+import { campaignClickUrl, getActiveCampaignsForDomain, pickWeighted, recordImpression, renderBannerHtml } from "@/features/campaigns/lib/selectCampaign";
 
 /**
  * Renders a staff member's current signature HTML by sender email. This is the seam the
@@ -44,6 +45,14 @@ export async function GET(req: NextRequest) {
 
   if (templateError) return NextResponse.json({ error: templateError.message }, { status: 500 });
 
-  const html = renderSignatureHtml(template.html, staff);
+  let html = renderSignatureHtml(template.html, staff);
+
+  const activeCampaigns = await getActiveCampaignsForDomain(staff.domain_id);
+  const campaign = pickWeighted(activeCampaigns);
+  if (campaign) {
+    html += renderBannerHtml(campaign, campaignClickUrl(campaign.id, staff.id));
+    recordImpression(campaign.id);
+  }
+
   return NextResponse.json({ html });
 }

@@ -17,6 +17,13 @@
   --text-lo: #71717a;
   /* Used by GenericTable to compute internal scroll height */
   --header-height: 72px;
+
+  /* Deploy-status chart colors — validated per-surface via the dataviz skill's
+     validate_palette.js (light: passes; dark uses darker steps to clear the
+     lightness-band check against the dark surface). */
+  --status-deployed: #10b981;
+  --status-pending: #f59e0b;
+  --status-error: #f43f5e;
 }
 
 :root.dark {
@@ -26,6 +33,10 @@
   --border: #26282c;
   --text-hi: #f4f4f5;
   --text-lo: #8b8d93;
+
+  --status-deployed: #059669;
+  --status-pending: #d97706;
+  --status-error: #e11d48;
 }
 
 @keyframes headerSlideIn {

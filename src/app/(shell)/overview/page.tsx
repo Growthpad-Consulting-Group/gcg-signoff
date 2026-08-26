@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import PageHeader from "@/shared/ui/PageHeader";
+import DeployStatusChart from "@/features/dashboard/ui/DeployStatusChart";
+import DomainHealthStrip from "@/features/dashboard/ui/DomainHealthStrip";
+import RecentActivity from "@/features/dashboard/ui/RecentActivity";
+
+interface Domain {
+  id: string;
+  name: string;
+  gateway_status: "not_configured" | "pending_dns" | "active" | "error";
+}
 
 interface Stats {
   staffCount: number;
@@ -11,6 +20,8 @@ interface Stats {
   domainCount: number;
   deployedCount: number;
   pendingCount: number;
+  errorCount: number;
+  domains: Domain[];
 }
 
 export default function OverviewPage() {
@@ -24,24 +35,28 @@ export default function OverviewPage() {
         fetch("/api/domains").then((r) => r.json()),
       ]);
       const staff = staffRes.staff || [];
-      const deployed = staff.filter((s: any) => s.signature_assignments?.[0]?.deploy_status === "deployed").length;
-      const pending = staff.filter((s: any) => (s.signature_assignments?.[0]?.deploy_status ?? "pending") === "pending").length;
+      const domains: Domain[] = domainsRes.domains || [];
+      const assignedStatuses: string[] = staff
+        .map((s: any) => s.signature_assignments?.[0]?.deploy_status)
+        .filter(Boolean);
       setStats({
         staffCount: staff.length,
         templateCount: (templatesRes.templates || []).length,
-        domainCount: (domainsRes.domains || []).length,
-        deployedCount: deployed,
-        pendingCount: pending,
+        domainCount: domains.length,
+        deployedCount: assignedStatuses.filter((s) => s === "deployed").length,
+        pendingCount: assignedStatuses.filter((s) => s === "pending").length,
+        errorCount: assignedStatuses.filter((s) => s === "error").length,
+        domains,
       });
     })();
   }, []);
 
   const cards = [
-    { label: "Staff", value: stats?.staffCount, icon: "solar:users-group-rounded-broken", href: "/staff" },
-    { label: "Templates", value: stats?.templateCount, icon: "solar:pen-new-square-broken", href: "/templates" },
-    { label: "Domains", value: stats?.domainCount, icon: "solar:global-broken", href: "/domains" },
-    { label: "Signatures deployed", value: stats?.deployedCount, icon: "solar:check-circle-broken", href: "/staff" },
-    { label: "Pending deploy", value: stats?.pendingCount, icon: "solar:clock-circle-broken", href: "/staff" },
+    { label: "Staff", value: stats?.staffCount, icon: "solar:users-group-rounded-broken", href: "/staff", accent: "bg-indigo-500/10 text-indigo-500" },
+    { label: "Templates", value: stats?.templateCount, icon: "solar:pen-new-square-broken", href: "/templates", accent: "bg-violet-500/10 text-violet-500" },
+    { label: "Domains", value: stats?.domainCount, icon: "solar:global-broken", href: "/domains", accent: "bg-teal-500/10 text-teal-500" },
+    { label: "Signatures deployed", value: stats?.deployedCount, icon: "solar:check-circle-broken", href: "/staff", accent: "bg-emerald-500/10 text-emerald-500" },
+    { label: "Pending deploy", value: stats?.pendingCount, icon: "solar:clock-circle-broken", href: "/staff", accent: "bg-amber-500/10 text-amber-500" },
   ];
 
   return (
@@ -55,13 +70,36 @@ export default function OverviewPage() {
             href={card.href}
             className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm transition-colors hover:bg-surface-2"
           >
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10">
-              <Icon icon={card.icon} className="h-5 w-5 text-brand-500" />
+            <div className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${card.accent}`}>
+              <Icon icon={card.icon} className="h-5 w-5" />
             </div>
             <p className="font-display text-2xl font-semibold text-text-hi">{card.value ?? "—"}</p>
             <p className="text-sm text-text-lo">{card.label}</p>
           </Link>
         ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+            <h2 className="mb-4 font-display text-sm font-semibold text-text-hi">Deploy status</h2>
+            {stats ? (
+              <DeployStatusChart deployed={stats.deployedCount} pending={stats.pendingCount} error={stats.errorCount} />
+            ) : (
+              <div className="h-36" />
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+            <h2 className="mb-3 font-display text-sm font-semibold text-text-hi">Domain health</h2>
+            {stats && <DomainHealthStrip domains={stats.domains} />}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+          <h2 className="mb-4 font-display text-sm font-semibold text-text-hi">Recent activity</h2>
+          <RecentActivity />
+        </div>
       </div>
     </div>
   );

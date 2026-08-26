@@ -1,0 +1,40 @@
+/*
+ * Recolors GrapesJS's own chrome (panels/toolbars/blocks manager) to track the app's
+ * light/dark theme (ThemeContext toggles the .dark class on <html>). GrapesJS's default skin
+ * is dark-only; without this it always looks dark regardless of the app's theme. The signature
+ * being edited lives inside the canvas iframe and is unaffected — an email renders on a light
+ * background regardless of the author's editor theme.
+ */
+:root {
+  --gjs-main-color: var(--surface-2);
+  --gjs-primary-color: var(--surface-2);
+  --gjs-secondary-color: var(--border);
+  --gjs-tertiary-color: #f05d23;
+  --gjs-font-color: var(--text-hi);
+  --gjs-font-color-active: var(--text-hi);
+  --gjs-main-dark-color: rgba(0, 0, 0, 0.08);
+  --gjs-main-light-color: rgba(0, 0, 0, 0.05);
+  --gjs-light-border: var(--border);
+  --gjs-secondary-dark-color: rgba(0, 0, 0, 0.06);
+  --gjs-secondary-light-color: rgba(0, 0, 0, 0.4);
+  --gjs-soft-light-color: rgba(0, 0, 0, 0.02);
+  --gjs-arrow-color: rgba(0, 0, 0, 0.4);
+  --gjs-dark-text-shadow: rgba(0, 0, 0, 0.06);
+}
+
+:root.dark {
+  --gjs-main-color: var(--surface-2);
+  --gjs-primary-color: var(--surface-2);
+  --gjs-secondary-color: var(--border);
+  --gjs-tertiary-color: #f05d23;
+  --gjs-font-color: var(--text-hi);
+  --gjs-font-color-active: #ffffff;
+  --gjs-main-dark-color: rgba(0, 0, 0, 0.3);
+  --gjs-main-light-color: rgba(255, 255, 255, 0.06);
+  --gjs-light-border: var(--border);
+  --gjs-secondary-dark-color: rgba(0, 0, 0, 0.2);
+  --gjs-secondary-light-color: rgba(255, 255, 255, 0.5);
+  --gjs-soft-light-color: rgba(255, 255, 255, 0.02);
+  --gjs-arrow-color: rgba(255, 255, 255, 0.5);
+  --gjs-dark-text-shadow: rgba(0, 0, 0, 0.4);
+}

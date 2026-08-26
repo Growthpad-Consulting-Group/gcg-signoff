@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { Editor } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
+import "./grapes-theme.css";
 import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
 
 export interface GrapesEditorHandle {

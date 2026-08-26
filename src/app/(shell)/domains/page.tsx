@@ -155,8 +155,6 @@ function DomainsPageInner() {
         name: editForm.name.trim(),
         platform: editForm.platform,
         gateway_status: editForm.gateway_status,
-        spf_verified: editForm.spf_verified,
-        dkim_verified: editForm.dkim_verified,
         notes: editForm.notes.trim() || null,
       }),
     });
@@ -429,25 +427,24 @@ function DomainsPageInner() {
               </p>
             </div>
             <div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm text-text-hi">
-                  <input
-                    type="checkbox"
-                    checked={editForm.spf_verified}
-                    onChange={(e) => setEditForm({ ...editForm, spf_verified: e.target.checked })}
+              <label className="mb-1 block text-sm font-medium text-text-hi">SPF / DKIM</label>
+              <div className="flex gap-4 rounded-lg border border-app-border bg-surface-2 px-3 py-2">
+                <span className="flex items-center gap-1.5 text-sm text-text-hi">
+                  <Icon
+                    icon={editForm.spf_verified ? "solar:check-circle-bold" : "solar:close-circle-broken"}
+                    className={editForm.spf_verified ? "h-4 w-4 text-emerald-500" : "h-4 w-4 text-text-lo"}
                   />
-                  SPF verified
-                </label>
-                <label className="flex items-center gap-2 text-sm text-text-hi">
-                  <input
-                    type="checkbox"
-                    checked={editForm.dkim_verified}
-                    onChange={(e) => setEditForm({ ...editForm, dkim_verified: e.target.checked })}
+                  SPF {editForm.spf_verified ? "verified" : "not verified"}
+                </span>
+                <span className="flex items-center gap-1.5 text-sm text-text-hi">
+                  <Icon
+                    icon={editForm.dkim_verified ? "solar:check-circle-bold" : "solar:close-circle-broken"}
+                    className={editForm.dkim_verified ? "h-4 w-4 text-emerald-500" : "h-4 w-4 text-text-lo"}
                   />
-                  DKIM verified
-                </label>
+                  DKIM {editForm.dkim_verified ? "verified" : "not verified"}
+                </span>
               </div>
-              <p className="mt-1 text-xs text-text-lo">These are normally set by "Verify DNS" on the domain card — only check manually if you've confirmed it another way.</p>
+              <p className="mt-1 text-xs text-text-lo">Read-only — these can only be set by running "Verify DNS" on the domain card, so they always reflect a real lookup.</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-hi">Notes</label>

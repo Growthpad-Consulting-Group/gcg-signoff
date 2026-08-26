@@ -2,6 +2,7 @@
 
 import { Icon } from "@iconify/react";
 import SimpleModal from "@/shared/ui/SimpleModal";
+import ModalLeftPanel, { ProTip } from "@/shared/ui/ModalLeftPanel";
 
 type Platform = "google_workspace" | "microsoft_365" | "other";
 
@@ -11,6 +12,18 @@ interface SetupGuideModalProps {
   platform: Platform;
   domainName: string;
 }
+
+const PLATFORM_ICON: Record<Platform, string> = {
+  google_workspace: "logos:google-gmail",
+  microsoft_365: "logos:microsoft-icon",
+  other: "solar:server-broken",
+};
+
+const PLATFORM_SUBTITLE: Record<Platform, string> = {
+  google_workspace: "Fully supported by the built-in gateway — follow these steps in order.",
+  microsoft_365: "The gateway doesn't have a Microsoft 365 connector yet — this is a starting point, not a turnkey guide.",
+  other: "No built-in integration — you'll need your own relay.",
+};
 
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -28,52 +41,68 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export default function SetupGuideModal({ isOpen, onClose, platform, domainName }: SetupGuideModalProps) {
   return (
-    <SimpleModal isOpen={isOpen} onClose={onClose} title={`Set up ${domainName}`} width="max-w-lg">
-      {platform === "google_workspace" && (
-        <ol className="space-y-4">
-          <Step n={1} title="Deploy the gateway somewhere with a static outbound IP">
-            A small always-on VM works — it's a long-running TCP listener, not a serverless function. Run it behind TLS if possible; Google supports STARTTLS to the gateway.
-          </Step>
-          <Step n={2} title="Restrict who can talk to it">
-            Set <code className="rounded bg-surface-2 px-1">GATEWAY_ALLOWED_IPS</code> to Google's published outbound-gateway IP ranges for your Workspace instance (shown in the Admin console when you configure step 4). Never leave this empty in production.
-          </Step>
-          <Step n={3} title="Enable Google's SMTP Relay service">
-            Admin console → Apps → Google Workspace → Gmail → Routing → SMTP relay service. Allow-list the gateway's own outbound IP there — this lets it hand mail back to Google for final delivery without needing its own SPF/DKIM setup. No DNS changes required for this step.
-          </Step>
-          <Step n={4} title="Configure the Outbound Gateway">
-            Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at your gateway's public host:port. Start scoped to a single test OU, not the whole org.
-          </Step>
-          <Step n={5} title="Send a real test message">
-            From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.
-          </Step>
-          <Step n={6} title="Widen the OU scope gradually">
-            Watch gateway logs for errors as you roll out to more of the domain.
-          </Step>
-          <Step n={7} title="Add the SPF/DKIM records">
-            Turn on DKIM signing in Admin console → Apps → Google Workspace → Gmail → Authenticate email, then add the TXT record it gives you plus <code className="rounded bg-surface-2 px-1">v=spf1 include:_spf.google.com ~all</code> for SPF. Use "Verify DNS" on this page once added.
-          </Step>
-        </ol>
-      )}
+    <SimpleModal isOpen={isOpen} onClose={onClose} title="" width="max-w-3xl" noPadding>
+      <div className="grid lg:grid-cols-5">
+        <ModalLeftPanel
+          title={`Set up ${domainName}`}
+          subtitle={PLATFORM_SUBTITLE[platform]}
+          icon={PLATFORM_ICON[platform]}
+          iconBg="richBeige"
+          footer={
+            <ProTip icon="solar:refresh-circle-broken">
+              Once the DNS records below are live, use "Verify DNS" on the domain card to confirm — it can take a few minutes to an hour for changes to propagate.
+            </ProTip>
+          }
+        />
 
-      {platform === "microsoft_365" && (
-        <div className="space-y-3 text-sm text-text-lo">
-          <p className="flex items-start gap-2">
-            <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            The gateway currently only implements the Google Workspace relay flow (SMTP listener + Google's SMTP Relay service). Microsoft 365 needs a transport rule routing outbound mail through an equivalent connector, which isn't built yet — treat this as a starting point, not a turnkey guide.
-          </p>
-          <p>In the meantime: add an SPF record (<code className="rounded bg-surface-2 px-1">v=spf1 include:spf.protection.outlook.com -all</code>) and enable DKIM signing in the Microsoft 365 Defender portal, then use "Verify DNS" on this page.</p>
-        </div>
-      )}
+        <div className="lg:col-span-3 max-h-[80vh] overflow-y-auto p-8">
+          {platform === "google_workspace" && (
+            <ol className="space-y-4">
+              <Step n={1} title="Deploy the gateway somewhere with a static outbound IP">
+                A small always-on VM works — it's a long-running TCP listener, not a serverless function. Run it behind TLS if possible; Google supports STARTTLS to the gateway.
+              </Step>
+              <Step n={2} title="Restrict who can talk to it">
+                Set <code className="rounded bg-surface-2 px-1">GATEWAY_ALLOWED_IPS</code> to Google's published outbound-gateway IP ranges for your Workspace instance (shown in the Admin console when you configure step 4). Never leave this empty in production.
+              </Step>
+              <Step n={3} title="Enable Google's SMTP Relay service">
+                Admin console → Apps → Google Workspace → Gmail → Routing → SMTP relay service. Allow-list the gateway's own outbound IP there — this lets it hand mail back to Google for final delivery without needing its own SPF/DKIM setup. No DNS changes required for this step.
+              </Step>
+              <Step n={4} title="Configure the Outbound Gateway">
+                Admin console → Apps → Google Workspace → Gmail → Routing → Outbound gateway, pointing at your gateway's public host:port. Start scoped to a single test OU, not the whole org.
+              </Step>
+              <Step n={5} title="Send a real test message">
+                From that test account, across a couple of clients (Gmail web, a phone's native mail app, Outlook if anyone uses it) — confirm the signature appears and replies/threading still look normal.
+              </Step>
+              <Step n={6} title="Widen the OU scope gradually">
+                Watch gateway logs for errors as you roll out to more of the domain.
+              </Step>
+              <Step n={7} title="Add the SPF/DKIM records">
+                Turn on DKIM signing in Admin console → Apps → Google Workspace → Gmail → Authenticate email, then add the TXT record it gives you plus <code className="rounded bg-surface-2 px-1">v=spf1 include:_spf.google.com ~all</code> for SPF.
+              </Step>
+            </ol>
+          )}
 
-      {platform === "other" && (
-        <div className="space-y-3 text-sm text-text-lo">
-          <p className="flex items-start gap-2">
-            <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-            "Other / generic SMTP" has no built-in gateway integration — you'll need your own relay that calls this app's render API to fetch and stamp each sender's signature.
-          </p>
-          <p>Whatever relay you use, make sure its outbound IP is covered by an SPF include for this domain, then use "Verify DNS" on this page to confirm.</p>
+          {platform === "microsoft_365" && (
+            <div className="space-y-3 text-sm text-text-lo">
+              <p className="flex items-start gap-2">
+                <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                The gateway currently only implements the Google Workspace relay flow (SMTP listener + Google's SMTP Relay service). Microsoft 365 needs a transport rule routing outbound mail through an equivalent connector, which isn't built yet.
+              </p>
+              <p>In the meantime: add an SPF record (<code className="rounded bg-surface-2 px-1">v=spf1 include:spf.protection.outlook.com -all</code>) and enable DKIM signing in the Microsoft 365 Defender portal.</p>
+            </div>
+          )}
+
+          {platform === "other" && (
+            <div className="space-y-3 text-sm text-text-lo">
+              <p className="flex items-start gap-2">
+                <Icon icon="solar:danger-triangle-broken" className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                "Other / generic SMTP" has no built-in gateway integration — you'll need your own relay that calls this app's render API to fetch and stamp each sender's signature.
+              </p>
+              <p>Whatever relay you use, make sure its outbound IP is covered by an SPF include for this domain.</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </SimpleModal>
   );
 }

@@ -9,11 +9,22 @@ export interface StarterTemplate {
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
 const SOCIAL_ICON = (icon: string) => `${APP_URL}/assets/icons/social/${icon}.png`;
 
-const SOCIAL_ROW = (links: { icon: string; href: string }[], size = 20) =>
+// A rounded badge behind each icon reads as far more "designed" than a bare flat icon — the
+// look most polished signature builders (WiseStamp included) use for their social rows. Uses a
+// plain background (not a CSS filter) since Outlook/most clients strip filter entirely.
+const BADGE_SOCIAL_ROW = (links: { icon: string; href: string }[], bg: string, badgeSize = 30, iconSize = 15) =>
   `<table cellpadding="0" cellspacing="0" border="0"><tr>${links
     .map(
       (l, i) =>
-        `<td style="${i > 0 ? "padding-left:10px;" : ""}"><a href="${l.href}"><img src="${SOCIAL_ICON(l.icon)}" width="${size}" height="${size}" alt="${l.icon}" style="display:block;" /></a></td>`
+        `<td style="${i > 0 ? "padding-left:8px;" : ""}">
+          <a href="${l.href}" style="text-decoration:none;">
+            <table cellpadding="0" cellspacing="0" border="0" width="${badgeSize}" height="${badgeSize}" style="background-color:${bg};border-radius:50%;">
+              <tr><td align="center" valign="middle" width="${badgeSize}" height="${badgeSize}">
+                <img src="${SOCIAL_ICON(l.icon)}" width="${iconSize}" height="${iconSize}" alt="${l.icon}" style="display:block;" />
+              </td></tr>
+            </table>
+          </a>
+        </td>`
     )
     .join("")}</tr></table>`;
 
@@ -74,7 +85,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
   </tr>
   <tr>
     <td style="padding-top:12px;">
-      ${SOCIAL_ROW(ALL_SOCIALS.slice(0, 3))}
+      ${BADGE_SOCIAL_ROW(ALL_SOCIALS.slice(0, 3), "#fff7ed")}
     </td>
   </tr>
 </table>`,
@@ -114,7 +125,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         </tr>
       </table>
       <table cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
-        <tr><td>${SOCIAL_ROW(ALL_SOCIALS.slice(0, 4), 18)}</td></tr>
+        <tr><td>${BADGE_SOCIAL_ROW(ALL_SOCIALS.slice(0, 4), "#f3f4f6")}</td></tr>
       </table>
     </td>
   </tr>
@@ -151,7 +162,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
           <td style="padding:8px 18px;background-color:#111827;border-radius:20px;">
             <a href="#" style="color:#ffffff;font-size:12px;font-weight:bold;text-decoration:none;">Schedule a call</a>
           </td>
-          <td style="padding-left:14px;">${SOCIAL_ROW(ALL_SOCIALS.slice(0, 3))}</td>
+          <td style="padding-left:14px;">${BADGE_SOCIAL_ROW(ALL_SOCIALS.slice(0, 3), "#fff1e9")}</td>
         </tr>
       </table>
     </td>
@@ -182,6 +193,59 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
 </table>`,
   },
   {
+    id: "navy",
+    name: "Navy professional",
+    description: "Dark navy side panel, white type, and circular badge social icons.",
+    html: `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;width:480px;">
+  <tr>
+    <td style="background-color:#0f2c4c;padding:20px;border-radius:8px 0 0 8px;width:110px;text-align:center;vertical-align:top;">
+      <img src="{{photo_url}}" width="72" height="72" alt="{{full_name}}" style="display:block;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.25);margin:0 auto;" />
+    </td>
+    <td style="background-color:#ffffff;border:1px solid #e5e7eb;border-left:0;border-radius:0 8px 8px 0;padding:20px;vertical-align:middle;">
+      <p style="margin:0;font-size:17px;font-weight:bold;color:#0f2c4c;">{{full_name}}</p>
+      <p style="margin:3px 0 0;font-size:13px;font-weight:bold;color:#2563eb;">{{role_title}}</p>
+      <p style="margin:2px 0 12px;font-size:12px;color:#6b7280;">{{department}}</p>
+      <p style="margin:0;font-size:12px;color:#374151;">
+        📧 <a href="mailto:{{email}}" style="color:#374151;text-decoration:none;">{{email}}</a> &nbsp;|&nbsp; 📞 {{phone}}
+      </p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
+        <tr><td>${BADGE_SOCIAL_ROW(ALL_SOCIALS.slice(0, 4), "#eef2ff")}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>`,
+  },
+  {
+    id: "creative-teal",
+    name: "Creative teal",
+    description: "Playful teal accent block, rounded photo tile, and a full social badge row.",
+    html: `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;color:#1f2937;width:460px;">
+  <tr>
+    <td style="width:8px;background-color:#0f766e;border-radius:6px;"></td>
+    <td style="width:16px;"></td>
+    <td style="vertical-align:top;">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding-right:16px;">
+            <img src="{{photo_url}}" width="68" height="68" alt="{{full_name}}" style="display:block;border-radius:14px;object-fit:cover;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <p style="margin:0;font-size:17px;font-weight:bold;color:#111827;">{{full_name}}</p>
+            <p style="margin:3px 0 0;font-size:13px;font-weight:bold;color:#0f766e;">{{role_title}} &middot; {{department}}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:12px 0 0;font-size:12px;color:#374151;">
+        📧 <a href="mailto:{{email}}" style="color:#374151;text-decoration:none;">{{email}}</a> &nbsp;|&nbsp; 📱 {{mobile}}
+      </p>
+      <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
+        <tr><td>${BADGE_SOCIAL_ROW(ALL_SOCIALS, "#ccfbf1")}</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>`,
+  },
+  {
     id: "minimal",
     name: "Minimal",
     description: "Text-only, no photo — a lightweight option when a full design isn't needed.",
@@ -194,7 +258,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         <a href="mailto:{{email}}" style="color:#374151;text-decoration:none;">{{email}}</a>
         &nbsp;|&nbsp; {{phone}}
       </p>
-      ${SOCIAL_ROW(ALL_SOCIALS.slice(0, 2))}
+      ${BADGE_SOCIAL_ROW(ALL_SOCIALS.slice(0, 2), "#fdf2ec", 26, 13)}
     </td>
   </tr>
 </table>`,

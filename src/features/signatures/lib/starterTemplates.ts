@@ -29,6 +29,23 @@ const CONTACT_ROW = (rows: { label: string; value: string; href?: string }[], ac
     )
     .join("");
 
+// Two-per-row contact grid (address alone, then phone+mobile side by side, etc.) — the layout
+// real signature builders use once there are more than 2 contact fields to show.
+const CONTACT_GRID = (rows: { label: string; value: string; href?: string }[][], accent: string) =>
+  `<table cellpadding="0" cellspacing="0" border="0">${rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map(
+            (r) =>
+              `<td style="padding:0 20px 4px 0;font-size:12px;color:#374151;white-space:nowrap;"><span style="color:${accent};font-weight:bold;">${r.label}</span>&nbsp; ${
+                r.href ? `<a href="${r.href}" style="color:#374151;text-decoration:none;">${r.value}</a>` : r.value
+              }</td>`
+          )
+          .join("")}</tr>`
+    )
+    .join("")}</table>`;
+
 // A full-width banner strip with a tagline and a solid CTA button — the bottom-of-signature
 // "banner maker" element that's the signature (pun intended) WiseStamp visual, and was
 // completely missing from the earlier drafts of this gallery.
@@ -89,6 +106,33 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
   <tr>
     <td colspan="2">
       ${CTA_BANNER("#fdece3", "#7c2d12", "Growthpad Consulting Group &mdash; strategy that ships.", "More info", "#f05d23")}
+    </td>
+  </tr>
+</table>`,
+  },
+  {
+    id: "classic-grid",
+    name: "Classic grid",
+    description: "Square photo, bold accent-colored name, and a compact two-column contact grid.",
+    html: `<table cellpadding="0" cellspacing="0" border="0" style="font-family:Arial,Helvetica,sans-serif;">
+  <tr>
+    <td style="padding-right:18px;vertical-align:top;">
+      <img src="{{photo_url}}" width="64" height="64" alt="{{full_name}}" style="display:block;border-radius:8px;object-fit:cover;" />
+    </td>
+    <td style="vertical-align:top;">
+      <p style="margin:0;font-size:16px;font-weight:bold;color:#f05d23;">{{full_name}}</p>
+      <p style="margin:2px 0 0;font-size:13px;color:#374151;">{{role_title}}</p>
+    </td>
+    <td style="width:24px;"></td>
+    <td style="border-left:1px solid #e5e7eb;padding-left:20px;vertical-align:top;">
+      ${CONTACT_GRID(
+        [
+          [{ label: "P", value: "{{phone}}" }, { label: "M", value: "{{mobile}}" }],
+          [{ label: "E", value: "{{email}}", href: "mailto:{{email}}" }],
+          [{ label: "D", value: "{{department}}" }],
+        ],
+        "#f05d23"
+      )}
     </td>
   </tr>
 </table>`,

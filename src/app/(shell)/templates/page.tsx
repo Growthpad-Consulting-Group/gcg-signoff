@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { Reorder } from "framer-motion";
+import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import toast from "react-hot-toast";
 import PageHeader from "@/shared/ui/PageHeader";
 import GenericEmptyState from "@/shared/ui/EmptyState";
@@ -74,6 +76,65 @@ function TemplateCardMenu({ onDuplicate, onDelete }: { onDuplicate: () => void; 
   );
 }
 
+function TemplateCard({
+  template,
+  usageCount,
+  dragDisabled,
+  onOpen,
+  onDuplicate,
+  onDelete,
+}: {
+  template: Template;
+  usageCount: number;
+  dragDisabled: boolean;
+  onOpen: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: template.id,
+    disabled: dragDisabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={onOpen}
+      className="flex cursor-pointer flex-col rounded-2xl border border-app-border bg-surface p-4 text-left shadow-sm transition-colors hover:bg-surface-2"
+    >
+      <div className="mb-3 overflow-hidden rounded-lg border border-app-border bg-white p-3">
+        <div className="pointer-events-none max-h-32 scale-[0.85] origin-top-left overflow-hidden text-black" dangerouslySetInnerHTML={{ __html: template.html }} />
+      </div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-text-hi">{template.name}</p>
+          {template.description && <p className="mt-0.5 line-clamp-2 text-xs text-text-lo">{template.description}</p>}
+        </div>
+        <TemplateCardMenu onDuplicate={onDuplicate} onDelete={onDelete} />
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs text-text-lo">
+        <span className="flex items-center gap-1">
+          <Icon icon="solar:clock-circle-broken" className="h-3.5 w-3.5" />
+          Updated {new Date(template.updated_at).toLocaleDateString()}
+        </span>
+        <span className="flex items-center gap-1">
+          <Icon icon="solar:users-group-rounded-broken" className="h-3.5 w-3.5" />
+          {usageCount}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
@@ -82,7 +143,8 @@ export default function TemplatesPage() {
   const [sortBy, setSortBy] = useState<SortBy>("manual");
   const router = useRouter();
   const reorderTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didDragRef = useRef(false);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const load = async () => {
     setLoading(true);
@@ -142,6 +204,8 @@ export default function TemplatesPage() {
     }, 500);
   };
 
+  const dragEnabled = sortBy === "manual" && !searchQuery.trim();
+
   const visibleTemplates = useMemo(() => {
     let list = templates;
     if (searchQuery.trim()) {
@@ -152,6 +216,18 @@ export default function TemplatesPage() {
     if (sortBy === "updated") list = [...list].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
     return list;
   }, [templates, searchQuery, sortBy]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!dragEnabled) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = templates.findIndex((t) => t.id === active.id);
+    const newIndex = templates.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(templates, oldIndex, newIndex);
+    setTemplates(reordered);
+    persistOrder(reordered);
+  };
 
   return (
     <div>
@@ -184,8 +260,10 @@ export default function TemplatesPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {sortBy !== "manual" && (
-              <span className="text-xs text-text-lo">Switch to Manual order to drag and reorder</span>
+            {!dragEnabled && (
+              <span className="text-xs text-text-lo">
+                {sortBy !== "manual" ? "Switch to Manual order to drag and reorder" : "Clear search to drag and reorder"}
+              </span>
             )}
             <select
               value={sortBy}
@@ -200,60 +278,23 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      <Reorder.Group
-        as="div"
-        axis="y"
-        values={visibleTemplates}
-        onReorder={(ordered) => {
-          if (sortBy !== "manual") return;
-          setTemplates(ordered);
-          persistOrder(ordered);
-        }}
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        {visibleTemplates.map((template) => (
-          <Reorder.Item
-            key={template.id}
-            value={template}
-            drag={sortBy === "manual"}
-            onDragStart={() => {
-              didDragRef.current = true;
-            }}
-            onClick={() => {
-              if (didDragRef.current) {
-                didDragRef.current = false;
-                return;
-              }
-              router.push(`/templates/${template.id}`);
-            }}
-            className="flex cursor-pointer flex-col rounded-2xl border border-app-border bg-surface p-4 text-left shadow-sm transition-colors hover:bg-surface-2"
-          >
-            <div className="mb-3 overflow-hidden rounded-lg border border-app-border bg-white p-3">
-              <div className="pointer-events-none max-h-32 scale-[0.85] origin-top-left overflow-hidden text-black" dangerouslySetInnerHTML={{ __html: template.html }} />
-            </div>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate font-medium text-text-hi">{template.name}</p>
-                {template.description && <p className="mt-0.5 line-clamp-2 text-xs text-text-lo">{template.description}</p>}
-              </div>
-              <TemplateCardMenu
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={visibleTemplates.map((t) => t.id)} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {visibleTemplates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                usageCount={usageCounts[template.id] || 0}
+                dragDisabled={!dragEnabled}
+                onOpen={() => router.push(`/templates/${template.id}`)}
                 onDuplicate={() => duplicateTemplate(template.id)}
                 onDelete={() => deleteTemplate(template.id, template.name)}
               />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-text-lo">
-              <span className="flex items-center gap-1">
-                <Icon icon="solar:clock-circle-broken" className="h-3.5 w-3.5" />
-                Updated {new Date(template.updated_at).toLocaleDateString()}
-              </span>
-              <span className="flex items-center gap-1">
-                <Icon icon="solar:users-group-rounded-broken" className="h-3.5 w-3.5" />
-                {usageCounts[template.id] || 0}
-              </span>
-            </div>
-          </Reorder.Item>
-        ))}
-      </Reorder.Group>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

@@ -52,7 +52,8 @@ export default function TemplateEditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [previewDark, setPreviewDark] = useState(false);
   const [previewMobile, setPreviewMobile] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [previewMounted, setPreviewMounted] = useState(false);
+  const [previewAnimateIn, setPreviewAnimateIn] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,6 +98,18 @@ export default function TemplateEditorPage() {
   };
 
   const lintFindings = useMemo(() => lintSignatureHtml(previewHtml), [previewHtml]);
+
+  const openPreview = () => {
+    setPreviewMounted(true);
+    // Mount closed first, then flip to the "in" state on the next frame so the
+    // transform/opacity transition actually has something to animate from.
+    requestAnimationFrame(() => requestAnimationFrame(() => setPreviewAnimateIn(true)));
+  };
+
+  const closePreview = () => {
+    setPreviewAnimateIn(false);
+    setTimeout(() => setPreviewMounted(false), 300);
+  };
 
   const previewData: MergeTagSource = previewAsId
     ? staffOptions.find((s) => s.id === previewAsId) || PREVIEW_STAFF
@@ -241,7 +254,7 @@ export default function TemplateEditorPage() {
             </span>
           )}
           <button
-            onClick={() => setShowPreview(true)}
+            onClick={openPreview}
             className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
           >
             <Icon icon="solar:eye-broken" className="h-4 w-4" />
@@ -266,17 +279,23 @@ export default function TemplateEditorPage() {
         Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
       </p>
 
-      {showPreview && (
+      {previewMounted && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowPreview(false)} />
-          <div className="relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-app-border bg-bg p-4 shadow-xl">
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${previewAnimateIn ? "opacity-100" : "opacity-0"}`}
+            onClick={closePreview}
+          />
+          <div
+            className={`relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-app-border bg-canvas p-4 shadow-xl transition-transform duration-300 ease-out ${previewAnimateIn ? "translate-x-0" : "translate-x-full"}`}
+          >
+
           <div className="mb-2 flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-sm font-medium text-text-hi">
               <Icon icon="solar:eye-broken" className="h-4 w-4" />
               Live preview
             </div>
             <button
-              onClick={() => setShowPreview(false)}
+              onClick={closePreview}
               className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
             >
               <Icon icon="solar:close-circle-broken" className="h-5 w-5" />

@@ -205,13 +205,14 @@ function TemplatesPageInner() {
     load();
   };
 
-  const deleteTemplate = async (id: string) => {
-    const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
+  const deleteTemplate = async (id: string, force = false) => {
+    const res = await fetch(`/api/templates/${id}${force ? "?force=true" : ""}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Failed to delete template");
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to delete template");
       return;
     }
-    toast.success("Template deleted");
+    toast.success(force ? "Template deleted and staff unassigned" : "Template deleted");
     setTemplates((prev) => prev.filter((t) => t.id !== id));
     setDeleteTarget(null);
   };
@@ -322,10 +323,14 @@ function TemplatesPageInner() {
       <ConfirmDialog
         isOpen={!!deleteTarget}
         title="Delete template?"
-        message={`Delete "${deleteTarget?.name}"? Staff assigned to it will need a new template.`}
-        confirmLabel="Delete"
+        message={
+          deleteTarget && usageCounts[deleteTarget.id] > 0
+            ? `"${deleteTarget.name}" is assigned to ${usageCounts[deleteTarget.id]} staff member${usageCounts[deleteTarget.id] === 1 ? "" : "s"} — deleting it will unassign them (they'll show as "unassigned" until given a new template).`
+            : `Delete "${deleteTarget?.name}"? This can't be undone.`
+        }
+        confirmLabel={deleteTarget && usageCounts[deleteTarget.id] > 0 ? "Delete anyway" : "Delete"}
         onConfirm={async () => {
-          if (deleteTarget) await deleteTemplate(deleteTarget.id);
+          if (deleteTarget) await deleteTemplate(deleteTarget.id, usageCounts[deleteTarget.id] > 0);
         }}
         onClose={() => setDeleteTarget(null)}
       />

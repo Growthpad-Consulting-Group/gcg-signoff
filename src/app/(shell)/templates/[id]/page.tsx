@@ -49,6 +49,7 @@ export default function TemplateEditorPage() {
   const [testEmail, setTestEmail] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [forceDeleteStaffCount, setForceDeleteStaffCount] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [previewDark, setPreviewDark] = useState(false);
   const [previewMobile, setPreviewMobile] = useState(false);
@@ -148,13 +149,19 @@ export default function TemplateEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, description]);
 
-  const deleteTemplate = async () => {
-    const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      toast.error("Failed to delete template");
+  const deleteTemplate = async (force = false) => {
+    const res = await fetch(`/api/templates/${id}${force ? "?force=true" : ""}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/templates");
       return;
     }
-    router.push("/templates");
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 409 && typeof body.staffCount === "number") {
+      setShowDeleteConfirm(false);
+      setForceDeleteStaffCount(body.staffCount);
+      return;
+    }
+    toast.error(body.error || "Failed to delete template");
   };
 
   const sendTestEmail = async () => {
@@ -357,10 +364,19 @@ export default function TemplateEditorPage() {
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         title="Delete template?"
-        message={`Delete "${name}"? Staff assigned to it will need a new template.`}
+        message={`Delete "${name}"? This can't be undone.`}
         confirmLabel="Delete"
-        onConfirm={deleteTemplate}
+        onConfirm={() => deleteTemplate()}
         onClose={() => setShowDeleteConfirm(false)}
+      />
+
+      <ConfirmDialog
+        isOpen={forceDeleteStaffCount !== null}
+        title="Template is assigned to staff"
+        message={`"${name}" is assigned to ${forceDeleteStaffCount} staff member${forceDeleteStaffCount === 1 ? "" : "s"} — deleting it will unassign them (they'll show as "unassigned" until given a new template).`}
+        confirmLabel="Delete anyway"
+        onConfirm={() => deleteTemplate(true)}
+        onClose={() => setForceDeleteStaffCount(null)}
       />
 
       <VersionHistoryModal

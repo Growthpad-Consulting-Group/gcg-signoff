@@ -59,10 +59,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ template });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const force = req.nextUrl.searchParams.get("force") === "true";
   const supabase = createServerSupabaseClient();
+
+  if (force) {
+    // Force delete: unassign any staff on this template first, so the FK restrict below never
+    // fires — they fall back to "unassigned" (already a handled state on the Staff page).
+    await supabase.from("signature_assignments").delete().eq("template_id", id);
+  }
+
   const { error } = await supabase.from("signature_templates").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (error) {
+    // 23503 = foreign key violation — signature_assignments.template_id is `on delete restrict`.
+    if (error.code === "23503") {
+      const { count } = await supabase
+        .from("signature_assignments")
+        .select("id", { count: "exact", head: true })
+        .eq("template_id", id);
+      return NextResponse.json(
+        { error: "This template is assigned to staff", staffCount: count ?? 0 },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

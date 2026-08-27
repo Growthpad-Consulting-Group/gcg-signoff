@@ -5,13 +5,14 @@ import { fetchSignatureHtml } from "./renderClient.js";
 import { appendToHtml, appendToText } from "./injectSignature.js";
 import { relayMessage } from "./relay.js";
 import { reportDeployStatus } from "./deployStatusClient.js";
+import { isIpAllowed } from "./ipMatch.js";
 
 function isAllowed(remoteAddress: string): boolean {
   if (config.allowedClientIps.length === 0) {
     console.warn("[gateway] GATEWAY_ALLOWED_IPS is empty — accepting mail from any IP. Set it before pointing production Workspace routing here.");
     return true;
   }
-  return config.allowedClientIps.includes(remoteAddress);
+  return isIpAllowed(remoteAddress, config.allowedClientIps);
 }
 
 const server = new SMTPServer({

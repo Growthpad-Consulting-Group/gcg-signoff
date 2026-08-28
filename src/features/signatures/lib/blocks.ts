@@ -84,7 +84,7 @@ export function createBlock(type: Block["type"]): Block {
     case "text":
       return { id, type, html: "<p>New text block — click to edit.</p>" };
     case "image":
-      return { id, type, src: "", alt: "", width: 120, align: "left" };
+      return { id, type, src: "", alt: "", width: 300, align: "left" };
     case "button":
       return { id, type, label: "Click here", url: "https://", bgColor: "#f05d23", textColor: "#ffffff", align: "left" };
     case "divider":

@@ -133,25 +133,33 @@ function SortableBlock({
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`group relative cursor-pointer rounded-lg border p-3 transition-colors ${
-        selected ? "border-brand-500 bg-brand-500/5" : "border-app-border bg-surface hover:bg-surface-2"
+      // Notion-style chrome: no permanent box, just a hover-revealed drag handle/delete and a
+      // left accent bar on selection — a permanent bordered card per block is what reads as
+      // "basic" as much as anything about the text editor itself.
+      className={`group relative flex cursor-pointer items-start gap-1 rounded-md py-1 pr-1 transition-colors ${
+        selected ? "bg-brand-500/5" : "hover:bg-surface-2/60"
       }`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <button {...attributes} {...listeners} onClick={(e) => e.stopPropagation()} className="cursor-grab text-text-lo hover:text-text-hi active:cursor-grabbing">
-          <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="text-text-lo opacity-0 transition-opacity hover:text-status-danger group-hover:opacity-100"
-        >
-          <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
-        </button>
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        className="mt-1 shrink-0 cursor-grab text-text-lo opacity-0 transition-opacity hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
+      >
+        <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
+      </button>
+      <div className={`min-w-0 flex-1 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
+        <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} />
       </div>
-      <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="mt-1 shrink-0 text-text-lo opacity-0 transition-opacity hover:text-status-danger group-hover:opacity-100"
+      >
+        <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
@@ -250,14 +258,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 overflow-y-auto bg-surface-2/40 p-8">
+      <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
         <div className="mx-auto w-full max-w-[600px]">
           {blocks.length === 0 ? (
             <p className="py-12 text-center text-sm text-text-lo">Add a block from the panel to get started.</p>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-3 rounded-lg bg-surface p-4 shadow-sm">
+                <div className="space-y-1 rounded-lg bg-surface p-6 shadow-sm">
                   {blocks.map((block) => (
                     <SortableBlock
                       key={block.id}

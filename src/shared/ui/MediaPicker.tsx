@@ -73,7 +73,9 @@ export default function MediaPicker({
       const { error: uploadError } = await supabase.storage.from(BUCKET).uploadToSignedUrl(path, token, file);
       if (uploadError) throw uploadError;
 
-      setUploadStatus("Compressing…");
+      setUploadStatus("Finishing up…");
+      // Compression itself now happens after this responds (see /api/uploads/finalize), so this
+      // step is quick — it just registers the upload and hands back a URL.
       const finalizeRes = await fetch("/api/uploads/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

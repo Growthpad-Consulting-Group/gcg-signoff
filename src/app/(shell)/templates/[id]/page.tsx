@@ -8,7 +8,6 @@ import PageHeader from "@/shared/ui/PageHeader";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import { lintSignatureHtml } from "@/features/signatures/lib/lintSignatureHtml";
-import { buildTrackedLinkHref, normalizeUrl } from "@/features/signatures/lib/trackedLink";
 import GrapesEditor, { GrapesEditorHandle } from "@/features/signatures/ui/GrapesEditor";
 import VersionHistoryModal from "@/features/signatures/ui/VersionHistoryModal";
 
@@ -110,30 +109,6 @@ export default function TemplateEditorPage() {
   const closePreview = () => {
     setPreviewAnimateIn(false);
     setTimeout(() => setPreviewMounted(false), 300);
-  };
-
-  // For linking an image: the block panel's "Link Block" wraps whatever's dropped inside it in
-  // an <a>, with an editable Href trait — but generating a tracked URL otherwise requires a text
-  // selection (the RTE toolbar button). This gives a copy-to-clipboard path for pasting into that
-  // trait, or any other href field, without needing a text component at all.
-  const copyTrackedLink = async () => {
-    const url = window.prompt("Destination URL (where the click should land):");
-    if (!url?.trim()) return;
-    let normalized: string;
-    try {
-      normalized = normalizeUrl(url);
-    } catch {
-      toast.error("That doesn't look like a valid URL — include https://");
-      return;
-    }
-    const label = window.prompt("Label for this link (optional, shown in click stats):") || "";
-    const trackedHref = buildTrackedLinkHref(id, normalized, label);
-    try {
-      await navigator.clipboard.writeText(trackedHref);
-      toast.success("Tracked link copied — paste it into the image/Link Block's Href field.");
-    } catch {
-      window.prompt("Copy this tracked link:", trackedHref);
-    }
   };
 
   const previewData: MergeTagSource = previewAsId
@@ -279,13 +254,6 @@ export default function TemplateEditorPage() {
             </span>
           )}
           <button
-            onClick={copyTrackedLink}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
-          >
-            <Icon icon="solar:link-broken" className="h-4 w-4" />
-            Copy tracked link
-          </button>
-          <button
             onClick={openPreview}
             className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
           >
@@ -309,7 +277,7 @@ export default function TemplateEditorPage() {
         />
       </div>
       <p className="mt-1 text-xs text-text-lo">
-        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details. For a tracked CTA, select some text and use "🔗+ Insert tracked link" in the toolbar. For a clickable image, drag the "Link Block" block (not "Link") onto the canvas, drop your image inside it, then use "Copy tracked link" above and paste it into the Link Block's Href field in the Settings panel.
+        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details. For a tracked CTA, select some text and use "🔗+ Insert tracked link" in the toolbar. For a clickable image, click it and set "Link URL" in the Settings panel — clicks are tracked automatically.
       </p>
 
       {previewMounted && (

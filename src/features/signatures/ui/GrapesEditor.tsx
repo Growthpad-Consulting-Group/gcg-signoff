@@ -38,6 +38,39 @@ async function uploadAssetForGrapes(file: File): Promise<string> {
   return url;
 }
 
+// Images get a "Link URL" trait (added to the image component type below) that writes a plain
+// `data-track-href`/`data-track-label` attribute — simpler to add as a trait than to make the
+// component wrap itself in an <a> live in the canvas. This turns that into the real tracked
+// redirect link at export time: any tagged <img> gets wrapped in <a href="tracked-url">.
+function wrapTrackedImages(html: string, templateId: string): string {
+  if (typeof window === "undefined" || !html.includes("data-track-href")) return html;
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+
+  root.querySelectorAll("img[data-track-href]").forEach((img) => {
+    const href = img.getAttribute("data-track-href");
+    const label = img.getAttribute("data-track-label") || "";
+    img.removeAttribute("data-track-href");
+    img.removeAttribute("data-track-label");
+    if (!href?.trim()) return;
+
+    let normalized: string;
+    try {
+      normalized = normalizeUrl(href);
+    } catch {
+      return; // leave the image un-wrapped rather than ship a broken link
+    }
+
+    const a = doc.createElement("a");
+    a.setAttribute("href", buildTrackedLinkHref(templateId, normalized, label));
+    img.replaceWith(a);
+    a.appendChild(img);
+  });
+
+  return root.innerHTML;
+}
+
 export interface GrapesEditorHandle {
   getExport: () => { html: string; css: string; projectData: unknown };
 }
@@ -63,7 +96,7 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
       const editor = editorRef.current;
       if (!editor) return { html: "", css: "", projectData: null };
       return {
-        html: editor.getHtml(),
+        html: wrapTrackedImages(editor.getHtml(), templateId),
         css: editor.getCss() || "",
         projectData: editor.getProjectData(),
       };
@@ -110,6 +143,22 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
       });
       editorRef.current = editor;
 
+      // Lets an image become a tracked clickable link directly from its own Settings panel —
+      // no separate "Link Block" wrapping needed. The trait just writes a plain data-* attribute
+      // on the <img>; wrapTrackedImages() turns that into a real tracked <a> at export time.
+      editor.Components.addType("image", {
+        extend: "image",
+        model: {
+          defaults: {
+            traits: [
+              "alt",
+              { type: "text", name: "data-track-href", label: "Link URL", placeholder: "https://…" },
+              { type: "text", name: "data-track-label", label: "Click label (optional)" },
+            ],
+          },
+        },
+      });
+
       editor.RichTextEditor.add("mergeTag", {
         icon: `<select class="gjs-field" style="max-width:110px;">
           <option value="">Insert tag…</option>
@@ -146,7 +195,7 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
       editor.on("update", () => {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
-          onChangeRef.current(editor.getHtml(), editor.getCss() || "", editor.getProjectData());
+          onChangeRef.current(wrapTrackedImages(editor.getHtml(), templateId), editor.getCss() || "", editor.getProjectData());
         }, 500);
       });
 
@@ -154,7 +203,7 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
       // getHtml() synchronously here can race ahead of that and return empty/partial content.
       // Wait for GrapesJS's own "load" event instead of firing immediately.
       editor.on("load", () => {
-        onChangeRef.current(editor.getHtml(), editor.getCss() || "", editor.getProjectData());
+        onChangeRef.current(wrapTrackedImages(editor.getHtml(), templateId), editor.getCss() || "", editor.getProjectData());
       });
     })();
 

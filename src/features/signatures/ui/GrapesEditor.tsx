@@ -6,6 +6,7 @@ import "grapesjs/dist/css/grapes.min.css";
 import "./grapes-theme.css";
 import toast from "react-hot-toast";
 import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
+import { buildTrackedLinkHref, normalizeUrl } from "@/features/signatures/lib/trackedLink";
 import { createBrowserSupabaseClient } from "@/shared/lib/supabase/client";
 
 const BUCKET = "signature-assets";
@@ -131,16 +132,13 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
           if (!url?.trim()) return;
           let normalized: string;
           try {
-            normalized = new URL(url.trim()).toString();
+            normalized = normalizeUrl(url);
           } catch {
             window.alert("That doesn't look like a valid URL — include https://");
             return;
           }
           const label = window.prompt("Label for this link (optional, shown in click stats):") || "";
-          const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-          const trackedHref = `${base}/api/templates/${templateId}/click?to=${encodeURIComponent(normalized)}&staff={{id}}${
-            label.trim() ? `&label=${encodeURIComponent(label.trim())}` : ""
-          }`;
+          const trackedHref = buildTrackedLinkHref(templateId, normalized, label);
           rte.insertHTML(`<a href="${trackedHref}">${label.trim() || normalized}</a>`);
         },
       });

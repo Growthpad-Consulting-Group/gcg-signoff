@@ -27,6 +27,9 @@ interface Assignment {
   template_id: string;
   deploy_status: "pending" | "deployed" | "error";
   last_deployed_at: string | null;
+  gmail_sync_status: "pending" | "synced" | "error" | "not_applicable";
+  gmail_sync_error: string | null;
+  last_gmail_synced_at: string | null;
   updated_at: string;
 }
 
@@ -58,6 +61,13 @@ const STATUS_STYLE: Record<string, string> = {
   deployed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   error: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+};
+
+const GMAIL_STATUS_STYLE: Record<string, string> = {
+  synced: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  error: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
+  not_applicable: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 function assignmentOf(staff: Staff): Assignment | null {
@@ -292,6 +302,8 @@ function StaffPageInner() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [syncingGmailId, setSyncingGmailId] = useState<string | null>(null);
+  const [syncingAllGmail, setSyncingAllGmail] = useState(false);
   const [editTarget, setEditTarget] = useState<Staff | null>(null);
   const [editForm, setEditForm] = useState<StaffForm | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -487,6 +499,34 @@ function StaffPageInner() {
     load();
   };
 
+  const syncGmail = async (staffId: string) => {
+    setSyncingGmailId(staffId);
+    const res = await fetch(`/api/staff/${staffId}/sync-gmail`, { method: "POST" });
+    setSyncingGmailId(null);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to push signature to Gmail");
+      load();
+      return;
+    }
+    toast.success("Signature pushed to their Gmail settings");
+    load();
+  };
+
+  const syncAllGmail = async () => {
+    setSyncingAllGmail(true);
+    const res = await fetch("/api/staff/sync-gmail", { method: "POST" });
+    setSyncingAllGmail(false);
+    if (!res.ok) {
+      toast.error("Failed to sync signatures to Gmail");
+      return;
+    }
+    const body = await res.json();
+    if (body.succeeded === body.total) toast.success(`Pushed to Gmail for all ${body.total} staff members`);
+    else toast.error(`Pushed ${body.succeeded} of ${body.total} — check individual rows for errors`);
+    load();
+  };
+
   const retryDeploy = async (staffId: string) => {
     setRetryingId(staffId);
     const res = await fetch(`/api/staff/${staffId}/retry-deploy`, { method: "POST" });
@@ -505,7 +545,17 @@ function StaffPageInner() {
         title="Staff"
         description="Everyone whose outgoing mail should carry a signature."
         icon="solar:users-group-rounded-broken"
-        actions={[{ label: "Add staff", icon: "solar:user-plus-broken", variant: "primary", onClick: () => setShowAdd(true), disabled: domains.length === 0 }]}
+        actions={[
+          {
+            label: syncingAllGmail ? "Syncing…" : "Sync all to Gmail",
+            icon: "logos:google-gmail",
+            onClick: syncAllGmail,
+            disabled: syncingAllGmail || staff.length === 0,
+            className:
+              "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-text-hi hover:bg-surface-2 transition-colors disabled:opacity-50",
+          },
+          { label: "Add staff", icon: "solar:user-plus-broken", variant: "primary", onClick: () => setShowAdd(true), disabled: domains.length === 0 },
+        ]}
       />
 
       {!loading && domains.length === 0 && (
@@ -588,7 +638,8 @@ function StaffPageInner() {
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Template</th>
-                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Gateway</th>
+                <th className="px-4 py-3">Gmail</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -664,6 +715,26 @@ function StaffPageInner() {
                             title="Marks pending again — takes effect on their next outgoing email"
                           >
                             {retryingId === person.id ? "Retrying…" : "Retry"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${GMAIL_STATUS_STYLE[assignment?.gmail_sync_status ?? "not_applicable"]}`}
+                          title={assignment?.gmail_sync_error || undefined}
+                        >
+                          {assignment ? assignment.gmail_sync_status.replace("_", " ") : "unassigned"}
+                        </span>
+                        {assignment && (
+                          <button
+                            onClick={() => syncGmail(person.id)}
+                            disabled={syncingGmailId === person.id}
+                            className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                            title="Push this signature directly into their Gmail settings — takes effect immediately, but only for Gmail web/app"
+                          >
+                            {syncingGmailId === person.id ? "Syncing…" : "Sync"}
                           </button>
                         )}
                       </div>

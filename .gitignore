@@ -28,7 +28,8 @@ next-env.d.ts
 .supabase/
 
 #history
-.historysupabase/.temp/
+.history
+
+supabase/.temp/
 .vercel
 .env*
-.history

@@ -27,7 +27,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: staff, error } = await supabase
     .from("staff")
-    .select("*, signature_assignments(id, template_id, deploy_status, last_deployed_at)")
+    .select(
+      "*, signature_assignments(id, template_id, deploy_status, last_deployed_at, gmail_sync_status, gmail_sync_error, last_gmail_synced_at)"
+    )
     .eq("id", id)
     .single();
 

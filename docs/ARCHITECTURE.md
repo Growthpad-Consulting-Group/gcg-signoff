@@ -73,6 +73,54 @@ endpoint the gateway will call. The gateway is a separate small service (Node/SM
 Cloudflare Email Worker are both reasonable) that sits between Workspace and the internet; it's
 the next piece to build once templates and staff data exist to test against.
 
+## 3b. What we learned running the gateway for real, and the lighter alternative it led to
+
+The gateway works — verified end-to-end multiple times with real delivered mail — but a
+first production rollout surfaced something the design didn't originally account for:
+**a brand-new sending IP has to earn Google's trust before delivery is fast and reliable.**
+Concretely: `smtp-relay.gmail.com` intermittently rejected our gateway's connection with
+`421-4.7.0 "Try again later"` for the first day or so, regardless of correct IP allowlisting,
+SMTP AUTH, or even a second fresh IP — none of that helped, because the rejection happens at
+EHLO, before any of that is evaluated. Google Postmaster Tools confirmed this directly:
+*"You haven't sent enough emails to personal Gmail accounts... continue to send at a steady
+rate."* Every message we traced through Google's own Email Log Search eventually succeeded —
+delivery was never actually lost, just delayed (minutes to a few hours) during this warm-up
+window. Full story and the abuse-pattern pitfall to avoid (rapid test bursts to many novel
+addresses look like spam to Google, worse than genuine warm-up) is in `gateway/README.md`'s
+"Operational status" section.
+
+Given that, `src/features/signatures/lib/gmailSync.ts` implements a second, lighter delivery
+mechanism: instead of intercepting mail in transit, it pushes a staff member's rendered
+signature directly into their Gmail account's own "sendAs" signature setting via the Gmail
+API (`users.settings.sendAs.patch`). Google is the only sender at any point — there's no new
+IP in the path, so there's nothing to warm up.
+
+**The trade-off:** this only takes effect when someone composes through Gmail's own web/app
+client. A third-party IMAP client (Outlook desktop, Apple Mail, Thunderbird) reads its own
+local signature setting instead and never sees this. For a Workspace-native team where
+everyone actually uses Gmail day to day, that's likely no loss in practice.
+
+**Recommended default:** use the Gmail push (`/staff` page → "Sync" per person, or "Sync all
+to Gmail") as the primary mechanism. Leave the gateway's Outbound Gateway setting **disabled**
+by default — keep the gateway deployed and ready, but only switch it on selectively for a
+specific person who genuinely needs a non-Gmail client covered. Running both live for the same
+person at the same time double-signs their mail (Gmail's native signature, then the gateway
+appending another copy in transit) — don't do that.
+
+**Setup required, one-time:** the Gmail push needs a Google Cloud service account authorized
+for domain-wide delegation:
+1. Google Cloud Console → create/select a project → APIs & Services → enable the **Gmail API**.
+2. IAM & Admin → Service Accounts → create one → Keys → create a JSON key. Set
+   `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (from that JSON)
+   in the app's env.
+3. Workspace Admin console → Security → API controls → Domain-wide Delegation → Add new →
+   paste the service account's numeric Client ID → Scope:
+   `https://www.googleapis.com/auth/gmail.settings.sharing`.
+
+This is an internal tool acting only within your own domain, so it does **not** need Google's
+public OAuth app verification/security-assessment process — that process exists for apps
+requesting consent from accounts outside your organization, which doesn't apply here.
+
 ## 4. DNS, SPF, and DKIM — what's actually required
 
 The Outbound Gateway is **not** an MX record change — inbound mail is untouched, and this is

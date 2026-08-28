@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
 
   let request = supabase
     .from("staff")
-    .select("*, signature_assignments(id, template_id, deploy_status, last_deployed_at, updated_at)")
+    .select(
+      "*, signature_assignments(id, template_id, deploy_status, last_deployed_at, gmail_sync_status, gmail_sync_error, last_gmail_synced_at, updated_at)"
+    )
     .order("full_name", { ascending: true });
 
   if (query) request = request.or(`full_name.ilike.%${query}%,email.ilike.%${query}%`);

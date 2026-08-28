@@ -38,18 +38,20 @@ function BlockPreview({
   editingText,
   templateId,
   onTextChange,
+  onInsertBlockAfter,
 }: {
   block: Block;
   editingText?: boolean;
   templateId?: string;
   onTextChange?: (html: string) => void;
+  onInsertBlockAfter?: (type: Block["type"]) => void;
 }) {
   switch (block.type) {
     case "text":
       // Only the selected text block mounts a live Tiptap instance — mounting one per block up
       // front would be wasteful, and only one can be focused/edited at a time anyway.
       return editingText && templateId && onTextChange ? (
-        <RichTextEditor html={block.html} onChange={onTextChange} templateId={templateId} />
+        <RichTextEditor html={block.html} onChange={onTextChange} templateId={templateId} onInsertBlockAfter={onInsertBlockAfter} />
       ) : (
         <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />
       );
@@ -117,6 +119,7 @@ function SortableBlock({
   onSelect,
   onRemove,
   onTextChange,
+  onInsertBlockAfter,
 }: {
   block: Block;
   selected: boolean;
@@ -124,6 +127,7 @@ function SortableBlock({
   onSelect: () => void;
   onRemove: () => void;
   onTextChange: (html: string) => void;
+  onInsertBlockAfter: (type: Block["type"]) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -149,7 +153,7 @@ function SortableBlock({
         <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
       </button>
       <div className={`min-w-0 flex-1 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
-        <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} />
+        <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} onInsertBlockAfter={onInsertBlockAfter} />
       </div>
       <button
         onClick={(e) => {
@@ -227,6 +231,20 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     if (selectedId === id) setSelectedId(null);
   };
 
+  // Splices a new block right after `afterId` — used by the "/" slash-command menu inside a
+  // text block, so a block can be added without leaving the writing flow for the side palette.
+  const insertBlockAfter = (afterId: string, type: Block["type"]) => {
+    const block = createBlock(type);
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === afterId);
+      if (idx === -1) return [...prev, block];
+      const next = [...prev];
+      next.splice(idx + 1, 0, block);
+      return next;
+    });
+    setSelectedId(block.id);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -275,6 +293,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                       onSelect={() => setSelectedId(block.id)}
                       onRemove={() => removeBlock(block.id)}
                       onTextChange={(html) => updateBlock(block.id, { html })}
+                      onInsertBlockAfter={(type) => insertBlockAfter(block.id, type)}
                     />
                   ))}
                 </div>

@@ -1,0 +1,87 @@
+import type { Block } from "./blocks";
+import { buildTrackedLinkHref, normalizeUrl } from "./trackedLink";
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
+const SOCIAL_ICON = (icon: string) => `${APP_URL}/assets/icons/social/${icon}.png`;
+
+const ALIGN_TD = (align: "left" | "center" | "right") => (align === "left" ? "" : `text-align:${align};`);
+
+/** Wraps `inner` in a tracked-click href, if `templateId` + `linkUrl` are both present and valid. Falls back to a plain (untracked) link, then to no link at all. */
+function trackedOrPlainHref(templateId: string | undefined, linkUrl: string | undefined, linkLabel: string | undefined): string | null {
+  if (!linkUrl?.trim()) return null;
+  let normalized: string;
+  try {
+    normalized = normalizeUrl(linkUrl);
+  } catch {
+    return null;
+  }
+  return templateId ? buildTrackedLinkHref(templateId, normalized, linkLabel || "") : normalized;
+}
+
+function serializeBlock(block: Block, templateId?: string): string {
+  switch (block.type) {
+    case "text":
+      return `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#374151;">${block.html}</td></tr>`;
+
+    case "image": {
+      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" style="display:block;width:${block.width}px;max-width:100%;border:0;" />`;
+      const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
+      const content = href ? `<a href="${href}">${img}</a>` : img;
+      return `<tr><td style="${ALIGN_TD(block.align)}">${content}</td></tr>`;
+    }
+
+    case "button": {
+      const href = trackedOrPlainHref(templateId, block.url, block.label) || "#";
+      return `<tr><td style="${ALIGN_TD(block.align)}">
+        <table cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color:${block.bgColor};border-radius:6px;padding:10px 20px;">
+          <a href="${href}" style="color:${block.textColor};font-size:13px;font-weight:bold;text-decoration:none;">${block.label}</a>
+        </td></tr></table>
+      </td></tr>`;
+    }
+
+    case "divider":
+      return `<tr><td style="padding:8px 0;"><div style="border-top:1px solid ${block.color};line-height:0;font-size:0;">&nbsp;</div></td></tr>`;
+
+    case "spacer":
+      return `<tr><td style="height:${block.height}px;line-height:${block.height}px;font-size:0;">&nbsp;</td></tr>`;
+
+    case "social": {
+      if (block.icons.length === 0) return "";
+      const iconsHtml = block.icons
+        .map(
+          (i, idx) =>
+            `<td style="${idx > 0 ? "padding-left:8px;" : ""}"><a href="${i.href}"><img src="${SOCIAL_ICON(i.icon)}" width="20" height="20" alt="${i.icon}" style="display:block;" /></a></td>`
+        )
+        .join("");
+      return `<tr><td style="${ALIGN_TD(block.align)}"><table cellpadding="0" cellspacing="0" border="0" style="${block.align === "center" ? "margin:0 auto;" : block.align === "right" ? "margin-left:auto;" : ""}"><tr>${iconsHtml}</tr></table></td></tr>`;
+    }
+
+    case "columns": {
+      const tds = block.columns
+        .map((col) => `<td style="vertical-align:top;padding:0 12px 0 0;"><table cellpadding="0" cellspacing="0" border="0" width="100%">${col.map((b) => serializeBlock(b, templateId)).join("")}</table></td>`)
+        .join("");
+      return `<tr><td><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${tds}</tr></table></td></tr>`;
+    }
+
+    case "html":
+      // Passed through verbatim — this is the escape hatch for legacy/advanced content.
+      return block.html;
+  }
+}
+
+/**
+ * Renders a block tree into inline-styled, table-based HTML — the only layout rules email
+ * clients actually respect (Outlook renders with Word's engine: no flexbox/grid, no external
+ * stylesheets). This becomes the new `html` column value, the same role GrapesJS's
+ * `editor.getHtml()` played before.
+ */
+export function serializeBlocks(blocks: Block[], templateId?: string): string {
+  // A lone "html" block (the legacy-template case) needs no outer wrapping table — it's
+  // typically already a complete `<table>...</table>` document on its own.
+  if (blocks.length === 1 && blocks[0].type === "html") {
+    return blocks[0].html;
+  }
+
+  const rows = blocks.map((b) => serializeBlock(b, templateId)).join("\n");
+  return `<table cellpadding="0" cellspacing="0" border="0" width="100%">\n${rows}\n</table>`;
+}

@@ -124,12 +124,16 @@ See `supabase/migrations/0001_init.sql` for the full schema, and
 - `POST /api/deploy-status` — the gateway reports back here after each relay, so
   `signature_assignments.deploy_status` reflects whether a message actually went out signed.
 - `gateway/` — the Outbound Gateway service itself: receives mail, calls `/api/render`, injects
-  the signature, relays via Google's SMTP Relay service, and reports status back. Verified
-  end-to-end locally (dry-run mode); not yet wired into real Workspace routing — see
-  `gateway/README.md` for the production rollout sequence.
+  the signature, relays via Google's SMTP Relay service, and reports status back. Deployed
+  live (Oracle Cloud, `145.241.124.158:25`) and proven end-to-end with real delivered mail —
+  but currently **paused** (Outbound Gateway disabled in Admin console) mid-IP-warm-up after a
+  batch of rapid test sends to many novel addresses got silently discarded by Google's relay
+  post-acceptance. See `gateway/README.md`'s "Operational status" section for the full story
+  and what to do differently on resume — short version: low steady volume to real recipients,
+  not test bursts.
 
-**Next (not yet built):**
-- Actually deploying the gateway and pointing Workspace's Outbound Gateway setting at it —
-  needs Google Admin console access (`gateway/README.md` has the exact steps and ordering).
+**Next:**
+- Resume Outbound Gateway with a disciplined, slow warm-up pace once ready (see
+  `gateway/README.md`).
 - Surfacing `deploy_status`/`deploy_error` in the `/staff` UI beyond the existing pill (e.g. a
   "why did this fail" detail view) once real deploy errors start happening.

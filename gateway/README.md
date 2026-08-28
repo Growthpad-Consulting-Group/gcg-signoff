@@ -63,6 +63,34 @@ This handles every piece of outgoing company mail. Don't skip straight to step 4
 6. **Widen the OU scope gradually**, watching gateway logs for errors, before rolling out to
    the whole domain.
 
+## Operational status (as of the first real rollout attempt)
+
+Real-world testing surfaced two things worth knowing before touching this again:
+
+1. **`smtp-relay.gmail.com` throttles brand-new sending IPs inconsistently.** A fresh
+   Reserved Public IP got a `421-4.7.0 "Try again later"` rejection at EHLO — before Google
+   even evaluates the allowlist or SMTP AUTH — the large majority of the time, with occasional
+   successes, for the first day or so. This wasn't fixable by any config change (IP allowlist,
+   SMTP AUTH, a second fresh IP all made no difference); it's Google's own front-end fleet
+   gradually building trust in the IP. Real Outbound Gateway traffic Google itself queues and
+   retries automatically on a 421/450 from us, so a throttled message during warm-up is
+   *delayed*, not lost — confirmed by watching a real message arrive ~7 minutes after the
+   gateway's first attempt failed.
+
+2. **Do not warm up by rapid-firing test messages to many different novel addresses.** That
+   pattern — a new domain/IP sending bursts to lots of distinct external recipients in minutes
+   — is indistinguishable from a spam campaign to Google's abuse detection. During testing this
+   produced messages that Google's relay *accepted* (`250 OK`) but then silently discarded
+   post-acceptance — no bounce, no spam-folder placement, just gone. Real warm-up needs the
+   opposite: low, steady volume to a small set of real, expected recipients, increasing
+   gradually over days — not synthetic test bursts. If messages start vanishing post-`250 OK`
+   with zero bounce, stop sending immediately (further bursts likely reinforce the suppression)
+   and fall back to Workspace's own **Reporting → Email Log Search** for the authoritative
+   per-message trace, rather than guessing from gateway logs alone.
+
+Given this, treat the rollout sequence below as needing a real multi-day warm-up pause between
+steps 4 and 6, not a same-day walkthrough.
+
 ## What this MVP doesn't handle yet
 
 - **Bounce/NDR handling** — delivery failures from Google's relay aren't surfaced anywhere yet

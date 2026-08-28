@@ -38,10 +38,10 @@ const server = new SMTPServer({
         const html = signatureHtml && parsed.html ? appendToHtml(parsed.html, signatureHtml) : parsed.html || undefined;
         const text = signatureHtml && parsed.text ? appendToText(parsed.text, signatureHtml) : parsed.text;
 
+        // In-Reply-To/References are safe in the generic headers map — unlike Message-ID,
+        // nodemailer doesn't auto-generate those, so there's no duplicate-header risk.
         const headers: Record<string, string> = {};
-        const messageId = parsed.messageId;
         const inReplyTo = parsed.inReplyTo;
-        if (messageId) headers["Message-ID"] = messageId;
         if (inReplyTo) headers["In-Reply-To"] = inReplyTo;
         if (parsed.references) headers["References"] = ([] as string[]).concat(parsed.references as any).join(" ");
 
@@ -55,6 +55,7 @@ const server = new SMTPServer({
             subject: parsed.subject,
             html: html || undefined,
             text,
+            messageId: parsed.messageId,
             headers,
             attachments: parsed.attachments.map((a) => ({
               filename: a.filename,

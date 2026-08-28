@@ -30,6 +30,14 @@ export interface RelayMessage {
   subject?: string;
   html?: string;
   text?: string;
+  /** The original message's Message-ID, preserved via nodemailer's dedicated `messageId`
+   * option — NOT passed through the generic `headers` map below, since nodemailer also
+   * auto-generates its own Message-ID header and a second one via `headers` would produce a
+   * malformed message with two conflicting Message-ID lines (Gmail can silently drop mail
+   * that looks like that, rather than just spam-flagging it). */
+  messageId?: string;
+  /** Everything else (In-Reply-To, References) — safe here since nodemailer doesn't
+   * auto-generate those. */
   headers?: Record<string, string>;
   attachments?: { filename?: string; content: Buffer; contentType?: string; cid?: string }[];
 }
@@ -52,6 +60,7 @@ export async function relayMessage(message: RelayMessage): Promise<void> {
     subject: message.subject,
     html: message.html,
     text: message.text,
+    messageId: message.messageId,
     headers: message.headers,
     attachments: message.attachments,
   });

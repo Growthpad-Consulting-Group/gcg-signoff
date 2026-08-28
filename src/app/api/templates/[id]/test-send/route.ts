@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (staffId) {
     const { data: staff } = await supabase
       .from("staff")
-      .select("full_name, email, role_title, department, phone, mobile, photo_url, domain_id")
+      .select("id, full_name, email, role_title, department, phone, mobile, photo_url, domain_id")
       .eq("id", staffId)
       .maybeSingle();
     if (staff) {

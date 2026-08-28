@@ -267,6 +267,7 @@ export default function TemplateEditorPage() {
         <GrapesEditor
           key={editorKey}
           ref={editorRef}
+          templateId={id}
           initialHtml={initialHtml}
           initialProjectData={initialProjectData}
           onChange={(html) => {
@@ -276,7 +277,7 @@ export default function TemplateEditorPage() {
         />
       </div>
       <p className="mt-1 text-xs text-text-lo">
-        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details.
+        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details. Use "🔗+ Insert tracked link" for a CTA whose clicks get logged; for a clickable image, drop it inside a "Link" block from the panel and paste the tracked URL into its link setting.
       </p>
 
       {previewMounted && (

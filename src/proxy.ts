@@ -15,6 +15,8 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith("/api/deploy-status") ||
     // Hit directly from a recipient's email client clicking a campaign banner — no session.
     /^\/api\/campaigns\/[^/]+\/click$/.test(pathname) ||
+    // Same, but for a tracked link embedded directly in a signature template.
+    /^\/api\/templates\/[^/]+\/click$/.test(pathname) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/icons") ||

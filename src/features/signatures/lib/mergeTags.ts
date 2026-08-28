@@ -6,6 +6,10 @@ export interface MergeTagSource {
   phone?: string | null;
   mobile?: string | null;
   photo_url?: string | null;
+  // Internal-only — resolved below but deliberately left out of MERGE_TAGS/the visible "insert
+  // merge tag" dropdown. It's only ever generated programmatically by the editor's "Insert
+  // tracked link" button (see GrapesEditor.tsx), never meant for an admin to type/pick by hand.
+  id?: string | null;
 }
 
 /** The merge tags a template author can drop into signature HTML, e.g. {{full_name}}. */
@@ -33,7 +37,9 @@ function escapeHtml(value: string): string {
  */
 export function renderSignatureHtml(templateHtml: string, staff: MergeTagSource): string {
   return templateHtml.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_match, tag: string) => {
-    const entry = MERGE_TAGS.find((t) => t.tag === tag.toLowerCase());
+    const lower = tag.toLowerCase();
+    if (lower === "id") return staff.id ? escapeHtml(staff.id) : "";
+    const entry = MERGE_TAGS.find((t) => t.tag === lower);
     if (!entry) return "";
     const value = staff[entry.field];
     return value ? escapeHtml(String(value)) : "";

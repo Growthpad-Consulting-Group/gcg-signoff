@@ -42,13 +42,14 @@ export interface GrapesEditorHandle {
 }
 
 interface GrapesEditorProps {
+  templateId: string;
   initialHtml: string;
   initialProjectData?: unknown;
   onChange: (html: string, css: string, projectData: unknown) => void;
 }
 
 const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function GrapesEditor(
-  { initialHtml, initialProjectData, onChange },
+  { templateId, initialHtml, initialProjectData, onChange },
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,6 +120,28 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
           const tag = select?.value;
           if (tag) rte.insertHTML(`{{${tag}}}`);
           if (select) select.value = "";
+        },
+      });
+
+      editor.RichTextEditor.add("trackedLink", {
+        icon: `<span style="font-size:12px;padding:0 2px;" title="Insert tracked link">🔗+</span>`,
+        event: "click",
+        result: (rte) => {
+          const url = window.prompt("Destination URL (where the click should land):");
+          if (!url?.trim()) return;
+          let normalized: string;
+          try {
+            normalized = new URL(url.trim()).toString();
+          } catch {
+            window.alert("That doesn't look like a valid URL — include https://");
+            return;
+          }
+          const label = window.prompt("Label for this link (optional, shown in click stats):") || "";
+          const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+          const trackedHref = `${base}/api/templates/${templateId}/click?to=${encodeURIComponent(normalized)}&staff={{id}}${
+            label.trim() ? `&label=${encodeURIComponent(label.trim())}` : ""
+          }`;
+          rte.insertHTML(`<a href="${trackedHref}">${label.trim() || normalized}</a>`);
         },
       });
 

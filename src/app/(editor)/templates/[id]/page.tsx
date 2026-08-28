@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
-import PageHeader from "@/shared/ui/PageHeader";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import { lintSignatureHtml } from "@/features/signatures/lib/lintSignatureHtml";
@@ -201,46 +200,38 @@ export default function TemplateEditorPage() {
   if (loading) return null;
 
   return (
-    <div>
-      <PageHeader
-        title={name || "Untitled template"}
-        description="Drag, drop, and edit visually — merge tags render with each staff member's own details."
-        icon="solar:pen-new-square-broken"
-        actions={[
-          { label: "History", icon: "solar:history-broken", onClick: () => setShowHistory(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-text-hi hover:bg-surface-2 transition-colors" },
-          { label: "Delete", icon: "solar:trash-bin-trash-broken", onClick: () => setShowDeleteConfirm(true), className: "inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-app-border bg-surface text-status-danger hover:bg-status-danger/10 transition-colors" },
-        ]}
-        saveAction={{ onSave: save, loading: saving, label: "Save template" }}
-      />
-
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-hi">Template name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+    <div className="flex h-screen flex-col overflow-hidden bg-canvas">
+      {/* Top bar — a dedicated full-viewport workspace instead of sitting inside the app's
+          sidebar/header/footer chrome, matching how Unlayer/Stripo/Beefree structure their
+          builders. */}
+      <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-app-border bg-surface px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <button
+            onClick={() => router.push("/templates")}
+            title="Back to templates"
+            className="shrink-0 rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+          >
+            <Icon icon="solar:arrow-left-broken" className="h-5 w-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Untitled template"
+              className="w-full truncate bg-transparent text-sm font-semibold text-text-hi outline-none placeholder:text-text-lo"
+            />
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add a description…"
+              className="w-full truncate bg-transparent text-xs text-text-lo outline-none"
+            />
+          </div>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-hi">Description</label>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional — e.g. which team this is for"
-            className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-      </div>
 
-      <div className="mb-2 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-text-hi">
-          <Icon icon="solar:widget-broken" className="h-4 w-4" />
-          Editor
-        </span>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           {autosaveStatus !== "idle" && (
-            <span className="flex items-center gap-1 text-xs font-normal text-text-lo">
+            <span className="hidden items-center gap-1 text-xs font-normal text-text-lo sm:flex">
               {autosaveStatus === "saving" ? (
                 <>
                   <Icon icon="solar:loading-bold" className="h-3.5 w-3.5 animate-spin" />
@@ -255,16 +246,38 @@ export default function TemplateEditorPage() {
             </span>
           )}
           <button
+            onClick={() => setShowHistory(true)}
+            title="Version history"
+            className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+          >
+            <Icon icon="solar:history-broken" className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            title="Delete template"
+            className="rounded-lg p-2 text-text-lo transition-colors hover:bg-status-danger/10 hover:text-status-danger"
+          >
+            <Icon icon="solar:trash-bin-trash-broken" className="h-4 w-4" />
+          </button>
+          <button
             onClick={openPreview}
             className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"
           >
             <Icon icon="solar:eye-broken" className="h-4 w-4" />
             Preview
           </button>
+          <button
+            onClick={() => save()}
+            disabled={saving}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50"
+          >
+            {saving ? <Icon icon="solar:loading-bold" className="h-4 w-4 animate-spin" /> : <Icon icon="solar:diskette-broken" className="h-4 w-4" />}
+            Save
+          </button>
         </div>
       </div>
 
-      <div className="rounded-lg border border-app-border p-4">
+      <div className="min-h-0 flex-1">
         <BlockEditor
           key={editorKey}
           ref={editorRef}
@@ -277,9 +290,6 @@ export default function TemplateEditorPage() {
           }}
         />
       </div>
-      <p className="mt-1 text-xs text-text-lo">
-        Add blocks from the panel, edit text inline, and use its toolbar's merge-tag dropdown to insert staff details or the link icon for a tracked CTA. For a clickable image, click it and set "Link URL" in the Settings panel — clicks are tracked automatically.
-      </p>
 
       {previewMounted && (
         <div className="fixed inset-0 z-50 flex justify-end">

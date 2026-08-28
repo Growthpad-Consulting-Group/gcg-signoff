@@ -231,16 +231,16 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+    <div className="flex h-full min-h-0">
       {/* Palette */}
-      <div className="lg:col-span-1">
+      <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Add block</p>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
+        <div className="space-y-2">
           {PALETTE.map((p) => (
             <button
               key={p.type}
               onClick={() => addBlock(p.type)}
-              className="flex items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
+              className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
             >
               <Icon icon={p.icon} className="h-4 w-4 text-brand-600" />
               {p.label}
@@ -250,32 +250,34 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       </div>
 
       {/* Canvas */}
-      <div className="min-h-[400px] rounded-lg border border-app-border bg-surface-2/40 p-4 lg:col-span-2">
-        {blocks.length === 0 ? (
-          <p className="py-12 text-center text-sm text-text-lo">Add a block from the panel to get started.</p>
-        ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-              <div className="space-y-3">
-                {blocks.map((block) => (
-                  <SortableBlock
-                    key={block.id}
-                    block={block}
-                    selected={block.id === selectedId}
-                    templateId={templateId}
-                    onSelect={() => setSelectedId(block.id)}
-                    onRemove={() => removeBlock(block.id)}
-                    onTextChange={(html) => updateBlock(block.id, { html })}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
+      <div className="flex-1 overflow-y-auto bg-surface-2/40 p-8">
+        <div className="mx-auto w-full max-w-[600px]">
+          {blocks.length === 0 ? (
+            <p className="py-12 text-center text-sm text-text-lo">Add a block from the panel to get started.</p>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-3 rounded-lg bg-surface p-4 shadow-sm">
+                  {blocks.map((block) => (
+                    <SortableBlock
+                      key={block.id}
+                      block={block}
+                      selected={block.id === selectedId}
+                      templateId={templateId}
+                      onSelect={() => setSelectedId(block.id)}
+                      onRemove={() => removeBlock(block.id)}
+                      onTextChange={(html) => updateBlock(block.id, { html })}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
       </div>
 
       {/* Settings */}
-      <div className="lg:col-span-1">
+      <div className="w-80 shrink-0 overflow-y-auto border-l border-app-border bg-surface p-4">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Settings</p>
         {!selected ? (
           <p className="text-sm text-text-lo">Select a block to edit its settings.</p>

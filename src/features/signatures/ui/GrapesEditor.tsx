@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { Editor } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
 import "./grapes-theme.css";
+import toast from "react-hot-toast";
 import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
 import { createBrowserSupabaseClient } from "@/shared/lib/supabase/client";
 
@@ -85,9 +86,21 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
           uploadFile: (e: DragEvent) => {
             const fileList = e.dataTransfer ? e.dataTransfer.files : (e.target as HTMLInputElement)?.files;
             const files = Array.from(fileList || []);
-            return Promise.all(files.map(uploadAssetForGrapes)).then((urls) => {
-              editorRef.current?.AssetManager.add(urls);
-            });
+            if (files.length === 0) return Promise.resolve();
+
+            // A custom `uploadFile` bypasses GrapesJS's own upload UI/progress entirely (per
+            // their docs), and the sign -> upload -> compress round trip can take several
+            // seconds for a large file — without this the screen just sits there looking stuck.
+            const toastId = toast.loading(files.length > 1 ? "Uploading images…" : "Uploading image…");
+            return Promise.all(files.map(uploadAssetForGrapes))
+              .then((urls) => {
+                editorRef.current?.AssetManager.add(urls);
+                toast.success("Image uploaded", { id: toastId });
+              })
+              .catch((err) => {
+                toast.error("Failed to upload image", { id: toastId });
+                throw err;
+              });
           },
         },
         plugins: [presetNewsletter],

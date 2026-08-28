@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import SimpleModal from "@/shared/ui/SimpleModal";
+import { createBrowserSupabaseClient } from "@/shared/lib/supabase/client";
+
+const BUCKET = "signature-assets";
+// Not a hard platform limit (Supabase Storage's own project cap is higher) — just a sane ceiling
+// so a genuinely wrong file gets a clear error instead of a slow multi-minute upload attempt.
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 interface MediaAsset {
   id: string;
@@ -25,6 +31,7 @@ export default function MediaPicker({
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,17 +50,44 @@ export default function MediaPicker({
   };
 
   const upload = async (file: File) => {
-    setUploading(true);
-    const formData = new FormData();
-    formData.append("files", file);
-    const res = await fetch("/api/uploads", { method: "POST", body: formData });
-    setUploading(false);
-    if (!res.ok) {
-      toast.error("Failed to upload image");
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error(`That file is too large (${(file.size / 1024 / 1024).toFixed(0)}MB) — please compress it below 50MB first.`);
       return;
     }
-    const { data } = await res.json();
-    if (data?.[0]) select(data[0]);
+
+    setUploading(true);
+    try {
+      // Upload straight to Supabase Storage from the browser via a signed URL, bypassing our
+      // own Vercel function's 4.5MB request-body cap — otherwise a large file (a big GIF, a
+      // raw photo export) would fail before our own upload code ever ran.
+      setUploadStatus("Uploading…");
+      const signRes = await fetch("/api/uploads/sign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name }),
+      });
+      if (!signRes.ok) throw new Error("Failed to prepare upload");
+      const { path, token } = await signRes.json();
+
+      const supabase = createBrowserSupabaseClient();
+      const { error: uploadError } = await supabase.storage.from(BUCKET).uploadToSignedUrl(path, token, file);
+      if (uploadError) throw uploadError;
+
+      setUploadStatus("Compressing…");
+      const finalizeRes = await fetch("/api/uploads/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, filename: file.name }),
+      });
+      if (!finalizeRes.ok) throw new Error("Failed to process upload");
+      const { url } = await finalizeRes.json();
+      select(url);
+    } catch {
+      toast.error("Failed to upload image");
+    } finally {
+      setUploading(false);
+      setUploadStatus("");
+    }
   };
 
   return (
@@ -123,8 +157,9 @@ export default function MediaPicker({
             className="inline-flex items-center gap-2 rounded-lg border border-app-border bg-surface px-4 py-2 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2 disabled:opacity-50"
           >
             {uploading ? <Icon icon="solar:loading-bold" className="h-4 w-4 animate-spin" /> : <Icon icon="solar:gallery-add-broken" className="h-4 w-4" />}
-            {uploading ? "Uploading…" : "Choose a file"}
+            {uploading ? uploadStatus || "Uploading…" : "Choose a file"}
           </button>
+          <p className="text-center text-xs text-text-lo">Large files (including GIFs) are automatically resized and compressed.</p>
         </div>
       )}
     </SimpleModal>

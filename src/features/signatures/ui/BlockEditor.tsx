@@ -6,6 +6,7 @@ import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useS
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import MediaPicker from "@/shared/ui/MediaPicker";
+import RichTextEditor from "@/features/signatures/ui/RichTextEditor";
 import { Align, Block, createBlock, wrapLegacyHtml } from "@/features/signatures/lib/blocks";
 import { serializeBlocks } from "@/features/signatures/lib/blockSerializer";
 
@@ -32,10 +33,26 @@ const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
 
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 
-function BlockPreview({ block }: { block: Block }) {
+function BlockPreview({
+  block,
+  editingText,
+  templateId,
+  onTextChange,
+}: {
+  block: Block;
+  editingText?: boolean;
+  templateId?: string;
+  onTextChange?: (html: string) => void;
+}) {
   switch (block.type) {
     case "text":
-      return <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />;
+      // Only the selected text block mounts a live Tiptap instance — mounting one per block up
+      // front would be wasteful, and only one can be focused/edited at a time anyway.
+      return editingText && templateId && onTextChange ? (
+        <RichTextEditor html={block.html} onChange={onTextChange} templateId={templateId} />
+      ) : (
+        <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />
+      );
     case "image":
       return block.src ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -93,7 +110,21 @@ function BlockPreview({ block }: { block: Block }) {
   }
 }
 
-function SortableBlock({ block, selected, onSelect, onRemove }: { block: Block; selected: boolean; onSelect: () => void; onRemove: () => void }) {
+function SortableBlock({
+  block,
+  selected,
+  templateId,
+  onSelect,
+  onRemove,
+  onTextChange,
+}: {
+  block: Block;
+  selected: boolean;
+  templateId: string;
+  onSelect: () => void;
+  onRemove: () => void;
+  onTextChange: (html: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -120,7 +151,7 @@ function SortableBlock({ block, selected, onSelect, onRemove }: { block: Block; 
           <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
         </button>
       </div>
-      <BlockPreview block={block} />
+      <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} />
     </div>
   );
 }
@@ -231,8 +262,10 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                     key={block.id}
                     block={block}
                     selected={block.id === selectedId}
+                    templateId={templateId}
                     onSelect={() => setSelectedId(block.id)}
                     onRemove={() => removeBlock(block.id)}
+                    onTextChange={(html) => updateBlock(block.id, { html })}
                   />
                 ))}
               </div>
@@ -249,15 +282,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         ) : (
           <div className="space-y-3">
             {selected.type === "text" && (
-              <Field label="Content (HTML)">
-                <textarea
-                  value={selected.html}
-                  onChange={(e) => updateBlock(selected.id, { html: e.target.value })}
-                  rows={6}
-                  className={inputClass}
-                />
-                <p className="mt-1 text-xs text-text-lo">Merge tags like {"{{full_name}}"} work here. Rich-text formatting is coming next.</p>
-              </Field>
+              <p className="text-sm text-text-lo">Edit the text directly in the canvas — use its toolbar for formatting, merge tags, and tracked links.</p>
             )}
 
             {selected.type === "image" && (

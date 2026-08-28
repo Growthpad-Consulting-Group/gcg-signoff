@@ -8,7 +8,8 @@ import PageHeader from "@/shared/ui/PageHeader";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { MergeTagSource, renderSignatureHtml } from "@/features/signatures/lib/mergeTags";
 import { lintSignatureHtml } from "@/features/signatures/lib/lintSignatureHtml";
-import GrapesEditor, { GrapesEditorHandle } from "@/features/signatures/ui/GrapesEditor";
+import BlockEditor, { BlockEditorHandle } from "@/features/signatures/ui/BlockEditor";
+import { Block } from "@/features/signatures/lib/blocks";
 import VersionHistoryModal from "@/features/signatures/ui/VersionHistoryModal";
 
 const PREVIEW_STAFF: MergeTagSource = {
@@ -38,7 +39,7 @@ export default function TemplateEditorPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [initialHtml, setInitialHtml] = useState("");
-  const [initialProjectData, setInitialProjectData] = useState<unknown>(undefined);
+  const [initialBlocks, setInitialBlocks] = useState<Block[] | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,7 +58,7 @@ export default function TemplateEditorPage() {
   const [editorKey, setEditorKey] = useState(0);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editorRef = useRef<GrapesEditorHandle>(null);
+  const editorRef = useRef<BlockEditorHandle>(null);
 
   useEffect(() => {
     (async () => {
@@ -74,7 +75,7 @@ export default function TemplateEditorPage() {
       setName(template.name);
       setDescription(template.description || "");
       setInitialHtml(template.html || "");
-      setInitialProjectData(template.builder_data || undefined);
+      setInitialBlocks(template.blocks || null);
       setPreviewHtml(template.html || "");
       setStaffOptions(staffRes.staff || []);
       setLoading(false);
@@ -85,14 +86,14 @@ export default function TemplateEditorPage() {
     })();
   }, [id, router]);
 
-  // After restoring a version, re-fetch the template and force the GrapesJS canvas to
-  // re-initialize with the restored content (it only reads initial* props on mount).
+  // After restoring a version, re-fetch the template and force the editor to re-initialize with
+  // the restored content (it only reads initial* props on mount).
   const reloadAfterRestore = async () => {
     const res = await fetch(`/api/templates/${id}`);
     if (!res.ok) return;
     const { template } = await res.json();
     setInitialHtml(template.html || "");
-    setInitialProjectData(template.builder_data || undefined);
+    setInitialBlocks(template.blocks || null);
     setPreviewHtml(template.html || "");
     setEditorKey((k) => k + 1);
   };
@@ -127,7 +128,7 @@ export default function TemplateEditorPage() {
         name,
         description,
         silent,
-        ...(exported ? { html: exported.html, css: exported.css, builder_data: exported.projectData } : {}),
+        ...(exported ? { html: exported.html, blocks: exported.blocks } : {}),
       }),
     });
 
@@ -263,21 +264,21 @@ export default function TemplateEditorPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-app-border">
-        <GrapesEditor
+      <div className="rounded-lg border border-app-border p-4">
+        <BlockEditor
           key={editorKey}
           ref={editorRef}
           templateId={id}
+          initialBlocks={initialBlocks}
           initialHtml={initialHtml}
-          initialProjectData={initialProjectData}
-          onChange={(html) => {
+          onChange={(_blocks, html) => {
             setPreviewHtml(html);
             scheduleAutosave();
           }}
         />
       </div>
       <p className="mt-1 text-xs text-text-lo">
-        Drag blocks from the panel, edit text inline, and use the merge-tag dropdown in the text toolbar to insert staff details. For a tracked CTA, select some text and use "🔗+ Insert tracked link" in the toolbar. For a clickable image, click it and set "Link URL" in the Settings panel — clicks are tracked automatically.
+        Add blocks from the panel, edit text inline, and use its toolbar's merge-tag dropdown to insert staff details or the link icon for a tracked CTA. For a clickable image, click it and set "Link URL" in the Settings panel — clicks are tracked automatically.
       </p>
 
       {previewMounted && (

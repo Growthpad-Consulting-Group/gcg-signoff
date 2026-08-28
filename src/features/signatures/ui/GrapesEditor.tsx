@@ -5,6 +5,36 @@ import type { Editor } from "grapesjs";
 import "grapesjs/dist/css/grapes.min.css";
 import "./grapes-theme.css";
 import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
+import { createBrowserSupabaseClient } from "@/shared/lib/supabase/client";
+
+const BUCKET = "signature-assets";
+
+// Uploads straight to Supabase Storage via a signed URL, then compresses server-side — the same
+// path MediaPicker uses. GrapesJS's default `upload: "/api/uploads"` POSTs the raw file through
+// our own Next.js route, which both Next's dev body-size warning and Vercel's 4.5MB production
+// cap choke on for anything but small files.
+async function uploadAssetForGrapes(file: File): Promise<string> {
+  const signRes = await fetch("/api/uploads/sign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name }),
+  });
+  if (!signRes.ok) throw new Error("Failed to prepare upload");
+  const { path, token } = await signRes.json();
+
+  const supabase = createBrowserSupabaseClient();
+  const { error: uploadError } = await supabase.storage.from(BUCKET).uploadToSignedUrl(path, token, file);
+  if (uploadError) throw uploadError;
+
+  const finalizeRes = await fetch("/api/uploads/finalize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path, filename: file.name }),
+  });
+  if (!finalizeRes.ok) throw new Error("Failed to process upload");
+  const { url } = await finalizeRes.json();
+  return url;
+}
 
 export interface GrapesEditorHandle {
   getExport: () => { html: string; css: string; projectData: unknown };
@@ -50,7 +80,16 @@ const GrapesEditor = forwardRef<GrapesEditorHandle, GrapesEditorProps>(function 
         fromElement: false,
         height: "600px",
         storageManager: false,
-        assetManager: { upload: "/api/uploads", autoAdd: true },
+        assetManager: {
+          autoAdd: true,
+          uploadFile: (e: DragEvent) => {
+            const fileList = e.dataTransfer ? e.dataTransfer.files : (e.target as HTMLInputElement)?.files;
+            const files = Array.from(fileList || []);
+            return Promise.all(files.map(uploadAssetForGrapes)).then((urls) => {
+              editorRef.current?.AssetManager.add(urls);
+            });
+          },
+        },
         plugins: [presetNewsletter],
         ...(initialProjectData ? { projectData: initialProjectData } : { components: initialHtml }),
       });

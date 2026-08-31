@@ -7,7 +7,18 @@ import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } 
 import { CSS } from "@dnd-kit/utilities";
 import MediaPicker from "@/shared/ui/MediaPicker";
 import RichTextEditor from "@/features/signatures/ui/RichTextEditor";
-import { Align, Block, createBlock, wrapLegacyHtml } from "@/features/signatures/lib/blocks";
+import {
+  Align,
+  Block,
+  ColumnPath,
+  createBlock,
+  findBlockById,
+  insertAfterId,
+  removeBlockById,
+  updateBlockById,
+  updateColumnList,
+  wrapLegacyHtml,
+} from "@/features/signatures/lib/blocks";
 import { serializeBlocks } from "@/features/signatures/lib/blockSerializer";
 
 export interface BlockEditorHandle {
@@ -31,27 +42,36 @@ const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "columns", label: "Columns", icon: "solar:layout-2-broken" },
 ];
 
+// Columns-within-columns isn't supported (one level of nesting is enough for the "slice a banner
+// into side-by-side clickable pieces" use case this exists for), so the mini palette shown
+// inside a column omits it.
+const MINI_PALETTE = PALETTE.filter((p) => p.type !== "columns");
+
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 
-function BlockPreview({
-  block,
-  editingText,
-  templateId,
-  onTextChange,
-  onInsertBlockAfter,
-}: {
-  block: Block;
-  editingText?: boolean;
-  templateId?: string;
-  onTextChange?: (html: string) => void;
-  onInsertBlockAfter?: (type: Block["type"]) => void;
-}) {
+interface ListActions {
+  selectedId: string | null;
+  templateId: string;
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+  onTextChange: (id: string, html: string) => void;
+  onInsertBlockAfter: (id: string, type: Block["type"]) => void;
+  onReorder: (path: ColumnPath | null, oldIndex: number, newIndex: number) => void;
+  onAddBlock: (path: ColumnPath | null, type: Block["type"]) => void;
+}
+
+function BlockPreview({ block, editingText, actions }: { block: Block; editingText?: boolean; actions: ListActions }) {
   switch (block.type) {
     case "text":
       // Only the selected text block mounts a live Tiptap instance — mounting one per block up
       // front would be wasteful, and only one can be focused/edited at a time anyway.
-      return editingText && templateId && onTextChange ? (
-        <RichTextEditor html={block.html} onChange={onTextChange} templateId={templateId} onInsertBlockAfter={onInsertBlockAfter} />
+      return editingText ? (
+        <RichTextEditor
+          html={block.html}
+          onChange={(html) => actions.onTextChange(block.id, html)}
+          templateId={actions.templateId}
+          onInsertBlockAfter={(type) => actions.onInsertBlockAfter(block.id, type)}
+        />
       ) : (
         <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />
       );
@@ -91,10 +111,12 @@ function BlockPreview({
       );
     case "columns":
       return (
-        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${block.columns.length}, 1fr)` }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${block.columns.length}, 1fr)` }}>
           {block.columns.map((col, idx) => (
-            <div key={idx} className="rounded border border-dashed border-app-border p-2 text-xs text-text-lo">
-              {col.length === 0 ? "Empty column" : `${col.length} block${col.length === 1 ? "" : "s"}`}
+            // Stops the click from bubbling up to select this columns block itself — a click
+            // inside a column should select whichever nested block (or nothing) it landed on.
+            <div key={idx} onClick={(e) => e.stopPropagation()} className="rounded-lg border border-dashed border-app-border p-2">
+              <BlockList blocks={col} path={{ columnsId: block.id, colIndex: idx }} actions={actions} nested />
             </div>
           ))}
         </div>
@@ -112,23 +134,8 @@ function BlockPreview({
   }
 }
 
-function SortableBlock({
-  block,
-  selected,
-  templateId,
-  onSelect,
-  onRemove,
-  onTextChange,
-  onInsertBlockAfter,
-}: {
-  block: Block;
-  selected: boolean;
-  templateId: string;
-  onSelect: () => void;
-  onRemove: () => void;
-  onTextChange: (html: string) => void;
-  onInsertBlockAfter: (type: Block["type"]) => void;
-}) {
+function SortableBlock({ block, actions }: { block: Block; actions: ListActions }) {
+  const selected = block.id === actions.selectedId;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
@@ -136,7 +143,7 @@ function SortableBlock({
     <div
       ref={setNodeRef}
       style={style}
-      onClick={onSelect}
+      onClick={() => actions.onSelect(block.id)}
       // Notion-style chrome: no permanent box, just a hover-revealed drag handle/delete and a
       // left accent bar on selection — a permanent bordered card per block is what reads as
       // "basic" as much as anything about the text editor itself.
@@ -153,17 +160,67 @@ function SortableBlock({
         <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
       </button>
       <div className={`min-w-0 flex-1 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
-        <BlockPreview block={block} editingText={selected} templateId={templateId} onTextChange={onTextChange} onInsertBlockAfter={onInsertBlockAfter} />
+        <BlockPreview block={block} editingText={selected} actions={actions} />
       </div>
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onRemove();
+          actions.onRemove(block.id);
         }}
         className="mt-1 shrink-0 text-text-lo opacity-0 transition-opacity hover:text-status-danger group-hover:opacity-100"
       >
         <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
       </button>
+    </div>
+  );
+}
+
+/** Renders one block list — either the top-level canvas (`path: null`) or one column of a
+ * `columns` block (`path` set) — with its own drag-and-drop scope. Recurses via BlockPreview's
+ * "columns" case, so nesting is just "a BlockList inside a BlockList". */
+function BlockList({ blocks, path, actions, nested }: { blocks: Block[]; path: ColumnPath | null; actions: ListActions; nested?: boolean }) {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = blocks.findIndex((b) => b.id === active.id);
+    const newIndex = blocks.findIndex((b) => b.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    actions.onReorder(path, oldIndex, newIndex);
+  };
+
+  return (
+    <div>
+      {blocks.length === 0 ? (
+        <p className={nested ? "py-3 text-center text-xs text-text-lo" : "py-12 text-center text-sm text-text-lo"}>
+          {nested ? "Empty column" : "Add a block from the panel to get started."}
+        </p>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {blocks.map((block) => (
+                <SortableBlock key={block.id} block={block} actions={actions} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+      {nested && (
+        <div className="mt-1 flex flex-wrap gap-0.5 border-t border-app-border pt-1">
+          {MINI_PALETTE.map((p) => (
+            <button
+              key={p.type}
+              title={`Add ${p.label}`}
+              onClick={() => actions.onAddBlock(path, p.type)}
+              className="rounded p-1 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+            >
+              <Icon icon={p.icon} className="h-3.5 w-3.5" />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -190,8 +247,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  const selected = blocks.find((b) => b.id === selectedId) || null;
+  const selected = selectedId ? findBlockById(blocks, selectedId) : null;
 
   useImperativeHandle(ref, () => ({
     getExport: () => ({ blocks, html: serializeBlocks(blocks, templateId) }),
@@ -217,7 +273,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   }, [blocks]);
 
   const updateBlock = (id: string, patch: Partial<Block>) => {
-    setBlocks((prev) => prev.map((b) => (b.id === id ? ({ ...b, ...patch } as Block) : b)));
+    setBlocks((prev) => updateBlockById(prev, id, patch));
   };
 
   const addBlock = (type: Block["type"]) => {
@@ -227,33 +283,43 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   };
 
   const removeBlock = (id: string) => {
-    setBlocks((prev) => prev.filter((b) => b.id !== id));
+    setBlocks((prev) => removeBlockById(prev, id));
     if (selectedId === id) setSelectedId(null);
   };
 
-  // Splices a new block right after `afterId` — used by the "/" slash-command menu inside a
-  // text block, so a block can be added without leaving the writing flow for the side palette.
+  // Splices a new block right after `afterId`, wherever it is in the tree — used by the "/"
+  // slash-command menu inside a text block, so a block can be added without leaving the writing
+  // flow for the side palette (or the mini palette, if the text block is inside a column).
   const insertBlockAfter = (afterId: string, type: Block["type"]) => {
     const block = createBlock(type);
     setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === afterId);
-      if (idx === -1) return [...prev, block];
-      const next = [...prev];
-      next.splice(idx + 1, 0, block);
-      return next;
+      const { result, inserted } = insertAfterId(prev, afterId, block);
+      return inserted ? result : [...prev, block];
     });
     setSelectedId(block.id);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setBlocks((prev) => {
-      const oldIndex = prev.findIndex((b) => b.id === active.id);
-      const newIndex = prev.findIndex((b) => b.id === over.id);
-      if (oldIndex === -1 || newIndex === -1) return prev;
-      return arrayMove(prev, oldIndex, newIndex);
-    });
+  // Adds to the top-level canvas (path null) or a specific column (path set) — the mini palette
+  // under each column uses this to let a column be filled without dragging from the main panel.
+  const addBlockToList = (path: ColumnPath | null, type: Block["type"]) => {
+    const block = createBlock(type);
+    setBlocks((prev) => (path ? updateColumnList(prev, path, (col) => [...col, block]) : [...prev, block]));
+    setSelectedId(block.id);
+  };
+
+  const reorderList = (path: ColumnPath | null, oldIndex: number, newIndex: number) => {
+    setBlocks((prev) => (path ? updateColumnList(prev, path, (col) => arrayMove(col, oldIndex, newIndex)) : arrayMove(prev, oldIndex, newIndex)));
+  };
+
+  const actions: ListActions = {
+    selectedId,
+    templateId,
+    onSelect: setSelectedId,
+    onRemove: removeBlock,
+    onTextChange: (id, html) => updateBlock(id, { html }),
+    onInsertBlockAfter: insertBlockAfter,
+    onReorder: reorderList,
+    onAddBlock: addBlockToList,
   };
 
   return (
@@ -278,28 +344,9 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       {/* Canvas */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
         <div className="mx-auto w-full max-w-[600px]">
-          {blocks.length === 0 ? (
-            <p className="py-12 text-center text-sm text-text-lo">Add a block from the panel to get started.</p>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-1 rounded-lg bg-surface p-6 shadow-sm">
-                  {blocks.map((block) => (
-                    <SortableBlock
-                      key={block.id}
-                      block={block}
-                      selected={block.id === selectedId}
-                      templateId={templateId}
-                      onSelect={() => setSelectedId(block.id)}
-                      onRemove={() => removeBlock(block.id)}
-                      onTextChange={(html) => updateBlock(block.id, { html })}
-                      onInsertBlockAfter={(type) => insertBlockAfter(block.id, type)}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
+          <div className="rounded-lg bg-surface p-6 shadow-sm">
+            <BlockList blocks={blocks} path={null} actions={actions} />
+          </div>
         </div>
       </div>
 
@@ -445,6 +492,23 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                   </select>
                 </Field>
               </>
+            )}
+
+            {selected.type === "columns" && (
+              <Field label="Number of columns">
+                <select
+                  value={selected.columns.length}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    const columns = Array.from({ length: n }, (_, i) => selected.columns[i] || []);
+                    updateBlock(selected.id, { columns });
+                  }}
+                  className={inputClass}
+                >
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                </select>
+              </Field>
             )}
 
             {selected.type === "html" && (

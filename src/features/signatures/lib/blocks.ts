@@ -105,3 +105,78 @@ export function createBlock(type: Block["type"]): Block {
 export function wrapLegacyHtml(html: string): Block[] {
   return [{ id: newBlockId(), type: "html", html }];
 }
+
+/** Identifies one column inside a specific `columns` block — the addressing scheme for
+ * operations (add/reorder) that need to know *which* list they're acting on, since a `columns`
+ * block can be nested arbitrarily deep alongside plain top-level blocks. */
+export interface ColumnPath {
+  columnsId: string;
+  colIndex: number;
+}
+
+/** Depth-first search for a block by id, descending into any `columns` block's columns. */
+export function findBlockById(blocks: Block[], id: string): Block | null {
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    if (b.type === "columns") {
+      for (const col of b.columns) {
+        const found = findBlockById(col, id);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+/** Patches a block by id, wherever it lives in the tree. */
+export function updateBlockById(blocks: Block[], id: string, patch: Partial<Block>): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) return { ...b, ...patch } as Block;
+    if (b.type === "columns") return { ...b, columns: b.columns.map((col) => updateBlockById(col, id, patch)) };
+    return b;
+  });
+}
+
+/** Removes a block by id, wherever it lives in the tree. */
+export function removeBlockById(blocks: Block[], id: string): Block[] {
+  return blocks
+    .filter((b) => b.id !== id)
+    .map((b) => (b.type === "columns" ? { ...b, columns: b.columns.map((col) => removeBlockById(col, id)) } : b));
+}
+
+/** Splices `newBlock` right after the block with id `afterId`, wherever it lives in the tree.
+ * `inserted` tells the caller whether `afterId` was actually found (so it can fall back to
+ * appending at the top level otherwise). */
+export function insertAfterId(blocks: Block[], afterId: string, newBlock: Block): { result: Block[]; inserted: boolean } {
+  let inserted = false;
+  const result = blocks.flatMap((b): Block[] => {
+    if (b.id === afterId) {
+      inserted = true;
+      return [b, newBlock];
+    }
+    if (b.type === "columns") {
+      const columns = b.columns.map((col) => {
+        const r = insertAfterId(col, afterId, newBlock);
+        if (r.inserted) inserted = true;
+        return r.result;
+      });
+      return [{ ...b, columns }];
+    }
+    return [b];
+  });
+  return { result, inserted };
+}
+
+/** Applies `fn` to the block list at `path` (one specific column of one specific `columns`
+ * block), wherever that block lives in the tree — used for reordering within, or adding into, a
+ * single column. */
+export function updateColumnList(blocks: Block[], path: ColumnPath, fn: (col: Block[]) => Block[]): Block[] {
+  return blocks.map((b) => {
+    if (b.id === path.columnsId && b.type === "columns") {
+      const columns = b.columns.map((col, i) => (i === path.colIndex ? fn(col) : col));
+      return { ...b, columns };
+    }
+    if (b.type === "columns") return { ...b, columns: b.columns.map((col) => updateColumnList(col, path, fn)) };
+    return b;
+  });
+}

@@ -40,7 +40,7 @@ const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
   { type: "divider", label: "Divider", icon: "solar:minus-square-broken" },
   { type: "spacer", label: "Spacer", icon: "solar:maximize-square-broken" },
   { type: "social", label: "Social row", icon: "solar:share-broken" },
-  { type: "columns", label: "Columns", icon: "solar:layout-2-broken" },
+  { type: "columns", label: "Columns", icon: "solar:widget-4-broken" },
 ];
 
 // Columns-within-columns isn't supported (one level of nesting is enough for the "slice a banner
@@ -262,6 +262,54 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
+  // Undo/redo over the whole block tree. Snapshots are coalesced on a pause in editing (not
+  // pushed per keystroke — that'd make undo require one press per character typed) using the
+  // same debounce-on-settle pattern as the autosave notification below, just with its own timer.
+  const historyRef = useRef<Block[][]>([]);
+  const futureRef = useRef<Block[][]>([]);
+  const lastSnapshotRef = useRef<Block[]>(blocks);
+  const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [historyVersion, setHistoryVersion] = useState(0); // bumped to re-render Undo/Redo's disabled state
+
+  const undo = () => {
+    if (historyRef.current.length === 0) return;
+    const previous = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, blocks];
+    lastSnapshotRef.current = previous;
+    setBlocks(previous);
+    setSelectedId(null);
+    setHistoryVersion((v) => v + 1);
+  };
+
+  const redo = () => {
+    if (futureRef.current.length === 0) return;
+    const next = futureRef.current[futureRef.current.length - 1];
+    futureRef.current = futureRef.current.slice(0, -1);
+    historyRef.current = [...historyRef.current, blocks];
+    lastSnapshotRef.current = next;
+    setBlocks(next);
+    setSelectedId(null);
+    setHistoryVersion((v) => v + 1);
+  };
+
+  // Cmd/Ctrl+Z / Cmd/Ctrl+Shift+Z — but not while focus is inside a text block's Tiptap editor,
+  // which has its own character-level undo (StarterKit's History extension); letting both fire
+  // on the same keypress would double-undo.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod || e.key.toLowerCase() !== "z") return;
+      if (e.target instanceof HTMLElement && e.target.closest(".ProseMirror")) return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
+
   const selected = selectedId ? findBlockById(blocks, selectedId) : null;
 
   useImperativeHandle(ref, () => ({
@@ -283,6 +331,25 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     }, 500);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
+
+  // Commits `lastSnapshotRef` (the state from before this burst of edits) onto the undo stack
+  // once edits settle, then moves the snapshot forward — one undo step per pause in editing.
+  useEffect(() => {
+    if (!mountedRef.current) return; // the mount-time effect above already set lastSnapshotRef
+    if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
+    historyDebounceRef.current = setTimeout(() => {
+      if (lastSnapshotRef.current !== blocks) {
+        historyRef.current = [...historyRef.current.slice(-49), lastSnapshotRef.current];
+        futureRef.current = [];
+        lastSnapshotRef.current = blocks;
+        setHistoryVersion((v) => v + 1);
+      }
+    }, 600);
+    return () => {
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks]);
@@ -359,6 +426,24 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       {/* Canvas */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
         <div className="mx-auto w-full max-w-[600px]">
+          <div className="mb-2 flex items-center justify-end gap-1" data-history-version={historyVersion}>
+            <button
+              onClick={undo}
+              disabled={historyRef.current.length === 0}
+              title="Undo (Ctrl/Cmd+Z)"
+              className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <Icon icon="solar:undo-left-broken" className="h-4 w-4" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={futureRef.current.length === 0}
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              <Icon icon="solar:undo-right-broken" className="h-4 w-4" />
+            </button>
+          </div>
           <div className="rounded-lg bg-surface p-6 shadow-sm">
             <BlockList blocks={blocks} path={null} actions={actions} />
           </div>

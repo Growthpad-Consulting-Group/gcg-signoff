@@ -527,6 +527,35 @@ function StaffPageInner() {
     load();
   };
 
+  const copySignature = async (person: Staff) => {
+    const res = await fetch(`/api/staff/${person.id}/signature-html`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.error(body.error || "Failed to load signature");
+      return;
+    }
+    const { html } = await res.json();
+
+    try {
+      // Rich-content copy so pasting into a webmail/mail-client signature field lands as
+      // formatted HTML, not a wall of raw markup — the manual-paste path for domains with no
+      // automated deployment (no Workspace, no server-level mail access).
+      if (navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([html], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(html);
+      }
+      toast.success("Signature copied — paste into their mailbox's signature settings");
+    } catch {
+      toast.error("Couldn't access clipboard — try again or check browser permissions");
+    }
+  };
+
   const retryDeploy = async (staffId: string) => {
     setRetryingId(staffId);
     const res = await fetch(`/api/staff/${staffId}/retry-deploy`, { method: "POST" });
@@ -755,6 +784,15 @@ function StaffPageInner() {
                         >
                           <Icon icon={suspended ? "solar:play-circle-broken" : "solar:pause-circle-broken"} className="h-4 w-4" />
                         </button>
+                        {assignment && (
+                          <button
+                            onClick={() => copySignature(person)}
+                            className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+                            title="Copy signature HTML — for manually pasting into a mailbox that isn't auto-deployed (e.g. no Google Workspace)"
+                          >
+                            <Icon icon="solar:copy-broken" className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(person)}
                           className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"

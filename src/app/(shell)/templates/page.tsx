@@ -13,6 +13,7 @@ import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import SimpleModal from "@/shared/ui/SimpleModal";
 import { DEFAULT_TEMPLATE_HTML } from "@/features/signatures/lib/defaultTemplate";
 import { STARTER_TEMPLATES } from "@/features/signatures/lib/starterTemplates";
+import { Block } from "@/features/signatures/lib/blocks";
 
 interface Template {
   id: string;
@@ -174,12 +175,12 @@ function TemplatesPageInner() {
     load();
   }, []);
 
-  const createTemplate = async (html: string = DEFAULT_TEMPLATE_HTML) => {
+  const createTemplate = async (html: string = DEFAULT_TEMPLATE_HTML, blocks?: Block[]) => {
     setCreating(true);
     const res = await fetch("/api/templates", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Untitled template", html }),
+      body: JSON.stringify({ name: "Untitled template", html, ...(blocks ? { blocks } : {}) }),
     });
     setCreating(false);
     if (!res.ok) {
@@ -364,7 +365,7 @@ function TemplatesPageInner() {
             <button
               key={starter.id}
               disabled={creating}
-              onClick={() => createTemplate(starter.html)}
+              onClick={() => createTemplate(starter.html, starter.blocks)}
               className="flex flex-col rounded-2xl border border-app-border bg-surface p-4 text-left transition-colors hover:bg-surface-2 disabled:opacity-50"
             >
               <div className="mb-3 overflow-hidden rounded-lg border border-app-border bg-white p-3">

@@ -638,8 +638,8 @@ function StaffPageInner() {
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Template</th>
-                <th className="px-4 py-3">Gateway</th>
                 <th className="px-4 py-3">Gmail</th>
+                <th className="px-4 py-3">Gateway</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -694,7 +694,34 @@ function StaffPageInner() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[assignment?.deploy_status ?? "pending"]}`}>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${GMAIL_STATUS_STYLE[assignment?.gmail_sync_status ?? "not_applicable"]}`}
+                          title={assignment?.gmail_sync_error || undefined}
+                        >
+                          {assignment ? assignment.gmail_sync_status.replace("_", " ") : "unassigned"}
+                        </span>
+                        {assignment && (
+                          <button
+                            onClick={() => syncGmail(person.id)}
+                            disabled={syncingGmailId === person.id}
+                            className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
+                            title="Push this signature directly into their Gmail settings — takes effect immediately, but only for Gmail web/app"
+                          >
+                            {syncingGmailId === person.id ? "Syncing…" : "Sync"}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[assignment?.deploy_status ?? "pending"]}`}
+                          title={
+                            assignment?.deploy_status === "pending"
+                              ? "Only resolves once this person sends real mail while their domain's Outbound Gateway is enabled in Google Admin console — it may be off, in which case this stays pending indefinitely by design."
+                              : undefined
+                          }
+                        >
                           {assignment ? assignment.deploy_status : "unassigned"}
                         </span>
                         {domainInactive && (
@@ -715,26 +742,6 @@ function StaffPageInner() {
                             title="Marks pending again — takes effect on their next outgoing email"
                           >
                             {retryingId === person.id ? "Retrying…" : "Retry"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${GMAIL_STATUS_STYLE[assignment?.gmail_sync_status ?? "not_applicable"]}`}
-                          title={assignment?.gmail_sync_error || undefined}
-                        >
-                          {assignment ? assignment.gmail_sync_status.replace("_", " ") : "unassigned"}
-                        </span>
-                        {assignment && (
-                          <button
-                            onClick={() => syncGmail(person.id)}
-                            disabled={syncingGmailId === person.id}
-                            className="text-xs font-medium text-brand-600 hover:underline disabled:opacity-50"
-                            title="Push this signature directly into their Gmail settings — takes effect immediately, but only for Gmail web/app"
-                          >
-                            {syncingGmailId === person.id ? "Syncing…" : "Sync"}
                           </button>
                         )}
                       </div>

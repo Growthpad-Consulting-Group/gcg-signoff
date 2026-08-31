@@ -12,6 +12,8 @@ export interface TextBlock {
   html: string; // rich-text HTML, may contain {{merge_tags}}
 }
 
+export type ImageShape = "square" | "rounded" | "circle";
+
 export interface ImageBlock {
   id: string;
   type: "image";
@@ -19,6 +21,7 @@ export interface ImageBlock {
   alt: string;
   width: number; // px
   height?: number; // px — unset means auto (preserve source aspect ratio)
+  shape?: ImageShape; // unset behaves as "square"
   align: Align;
   linkUrl?: string;
   linkLabel?: string;
@@ -87,6 +90,16 @@ export interface HtmlBlock {
 }
 
 export type Block = TextBlock | ImageBlock | ButtonBlock | DividerBlock | SpacerBlock | SocialBlock | ColumnsBlock | HtmlBlock;
+
+/** CSS border-radius for an image's `shape` — shared between the editor's live preview and
+ * blockSerializer's HTML output so they never drift. A large fixed px value (rather than 50%)
+ * for "circle" still renders as a full circle on a square image and degrades to a pill shape on
+ * a non-square one, rather than an ellipse, which reads better if width/height aren't equal. */
+export function imageBorderRadius(shape: ImageShape | undefined): string {
+  if (shape === "circle") return "9999px";
+  if (shape === "rounded") return "8px";
+  return "0";
+}
 
 export function newBlockId(): string {
   return typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);

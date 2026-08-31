@@ -70,7 +70,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       description: "Photo on a tinted backdrop, letter-prefixed contact rows, and a bottom promo banner with a button.",
       blocks: [
         columns(
-          [[photo(80, { align: "center" })], [text(`<p style="margin:0;font-size:22px;font-weight:bold;color:#f05d23;">{{full_name}}</p><p style="margin:2px 0 10px;font-size:14px;color:#111827;">{{role_title}}, {{department}}</p>${contactHtml([{ label: "P", value: "{{phone}}" }, { label: "E", value: "{{email}}", href: "mailto:{{email}}" }], "#f05d23")}`)]],
+          [[photo(80, { height: 80, shape: "circle", align: "center" })], [text(`<p style="margin:0;font-size:22px;font-weight:bold;color:#f05d23;">{{full_name}}</p><p style="margin:2px 0 10px;font-size:14px;color:#111827;">{{role_title}}, {{department}}</p>${contactHtml([{ label: "P", value: "{{phone}}" }, { label: "E", value: "{{email}}", href: "mailto:{{email}}" }], "#f05d23")}`)]],
           [{ backgroundColor: "#fff1e9", padding: 12 }, {}]
         ),
         social(ALL_SOCIALS.slice(0, 3)),
@@ -87,7 +87,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       blocks: [
         columns(
           [
-            [photo(64, { height: 64 })],
+            [photo(64, { height: 64, shape: "rounded" })],
             [text(`<p style="margin:0;font-size:16px;font-weight:bold;color:#f05d23;">{{full_name}}</p><p style="margin:2px 0 0;font-size:13px;color:#374151;">{{role_title}}</p>`)],
             [text(contactHtml([{ label: "P", value: "{{phone}}" }, { label: "M", value: "{{mobile}}" }, { label: "E", value: "{{email}}", href: "mailto:{{email}}" }, { label: "D", value: "{{department}}" }], "#f05d23"))],
           ],
@@ -119,7 +119,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       description: "Tinted photo frame with pill-style contact chips and a full social row.",
       blocks: [
         columns(
-          [[photo(76, { align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#111827;">{{full_name}}</p><p style="margin:3px 0 0;font-size:13px;font-weight:bold;color:#f05d23;">{{role_title}}</p><p style="margin:2px 0 0;font-size:12px;color:#9ca3af;">{{department}}</p>`)]],
+          [[photo(76, { height: 76, shape: "circle", align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#111827;">{{full_name}}</p><p style="margin:3px 0 0;font-size:13px;font-weight:bold;color:#f05d23;">{{role_title}}</p><p style="margin:2px 0 0;font-size:12px;color:#9ca3af;">{{department}}</p>`)]],
           [{ backgroundColor: "#fff7ed", padding: 10 }, {}]
         ),
         text(`<p style="margin:0;font-size:11px;color:#374151;"><a href="mailto:{{email}}" style="color:#374151;text-decoration:none;">{{email}}</a> &nbsp;|&nbsp; {{phone}}</p>`),
@@ -132,7 +132,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       description: "Dark navy side panel, a full divider, and letter-prefixed contact rows.",
       blocks: [
         columns(
-          [[photo(72, { align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#0f2c4c;">{{full_name}}</p><p style="margin:3px 0 10px;font-size:13px;font-weight:bold;color:#2563eb;">{{role_title}}, {{department}}</p>${contactHtml([{ label: "P", value: "{{phone}}" }, { label: "E", value: "{{email}}", href: "mailto:{{email}}" }], "#2563eb")}`)]],
+          [[photo(72, { height: 72, shape: "circle", align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#0f2c4c;">{{full_name}}</p><p style="margin:3px 0 10px;font-size:13px;font-weight:bold;color:#2563eb;">{{role_title}}, {{department}}</p>${contactHtml([{ label: "P", value: "{{phone}}" }, { label: "E", value: "{{email}}", href: "mailto:{{email}}" }], "#2563eb")}`)]],
           [{ backgroundColor: "#0f2c4c", padding: 20 }, { padding: 20 }]
         ),
         social(ALL_SOCIALS.slice(0, 4)),
@@ -145,7 +145,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       blocks: [
         columns(
           [
-            [photo(70)],
+            [photo(70, { shape: "rounded" })],
             [
               text(
                 `<p style="margin:0;font-size:17px;color:#231812;">{{full_name}}</p><p style="margin:4px 0 0;font-size:12px;color:#8a6d3b;letter-spacing:0.5px;">{{role_title}}</p><p style="margin:2px 0 12px;font-size:11px;color:#9ca3af;">{{department}}</p>${contactHtml(
@@ -165,7 +165,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = (
       description: "Teal accent bar, rounded photo tile, and a full social icon row.",
       blocks: [
         columns(
-          [[photo(68, { align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#111827;">{{full_name}}</p><p style="margin:3px 0 10px;font-size:13px;font-weight:bold;color:#0f766e;">{{role_title}} &middot; {{department}}</p>${contactHtml([{ label: "E", value: "{{email}}", href: "mailto:{{email}}" }, { label: "M", value: "{{mobile}}" }], "#0f766e")}`)]],
+          [[photo(68, { height: 68, shape: "rounded", align: "center" })], [text(`<p style="margin:0;font-size:17px;font-weight:bold;color:#111827;">{{full_name}}</p><p style="margin:3px 0 10px;font-size:13px;font-weight:bold;color:#0f766e;">{{role_title}} &middot; {{department}}</p>${contactHtml([{ label: "E", value: "{{email}}", href: "mailto:{{email}}" }, { label: "M", value: "{{mobile}}" }], "#0f766e")}`)]],
           [{ backgroundColor: "#ccfbf1", padding: 4 }, { padding: 16 }]
         ),
         social(ALL_SOCIALS),

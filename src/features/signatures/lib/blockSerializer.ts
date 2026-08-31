@@ -1,4 +1,5 @@
 import type { Block } from "./blocks";
+import { imageBorderRadius } from "./blocks";
 import { buildTrackedLinkHref, normalizeUrl } from "./trackedLink";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
@@ -29,7 +30,10 @@ function serializeBlock(block: Block, templateId?: string): string {
       // stretches/distorts instead of cropping). No workaround for that short of shipping a
       // pre-cropped image; a known, unavoidable email-client gap, not a bug here.
       const heightStyle = block.height ? `height:${block.height}px;object-fit:cover;` : "";
-      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border:0;" />`;
+      // Outlook desktop's Word-based renderer ignores border-radius on <img> same as it ignores
+      // object-fit above — Gmail/Apple Mail/mobile clients render it fine. Same accepted gap.
+      const radiusStyle = `border-radius:${imageBorderRadius(block.shape)};`;
+      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}${radiusStyle}border:0;" />`;
       const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
       // The anchor needs its own explicit size matching the image — without one, wrapping a
       // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it

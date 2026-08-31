@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
+import { CollisionDetection, DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, closestCenter, pointerWithin, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import MediaPicker from "@/shared/ui/MediaPicker";
@@ -12,11 +12,13 @@ import {
   Block,
   ColumnPath,
   ColumnStyle,
+  ImageShape,
   cloneBlockWithNewIds,
   createBlock,
   findBlockById,
   findContainerPath,
   getListAt,
+  imageBorderRadius,
   insertAfterId,
   insertIntoList,
   removeBlockById,
@@ -38,6 +40,25 @@ function parseContainerId(id: string): ColumnPath | null | undefined {
   const m = /^container:(.+):(\d+)$/.exec(id);
   return m ? { columnsId: m[1], colIndex: Number(m[2]) } : undefined;
 }
+
+// Plain `closestCenter` doesn't understand nesting: the root canvas's own droppable rect spans
+// the entire tree (every column and block lives inside it), so its center can end up "closer"
+// than the actual, much smaller column being hovered — the exact bug where one column highlights
+// on hover and a sibling column never does. Trying `pointerWithin` first (which container is the
+// pointer literally inside?) and, among matches, preferring the smallest rect (the innermost,
+// most specific container rather than a large ancestor) is dnd-kit's own documented fix for
+// nested multi-container trees like this one.
+const collisionDetectionStrategy: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length === 0) return closestCenter(args);
+  return [...pointerCollisions].sort((a, b) => {
+    const rectA = args.droppableRects.get(a.id);
+    const rectB = args.droppableRects.get(b.id);
+    const areaA = rectA ? rectA.width * rectA.height : Infinity;
+    const areaB = rectB ? rectB.width * rectB.height : Infinity;
+    return areaA - areaB;
+  });
+};
 
 // Draggable id for a palette entry — distinguishes "dragging a new block in from the palette"
 // from "reordering/moving an existing block" in onDragEnd, since both share one DndContext.
@@ -106,7 +127,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
         <img
           src={block.src}
           alt={block.alt}
-          style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, maxWidth: "100%" }}
+          style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%" }}
           className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
         />
       ) : (
@@ -556,7 +577,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex h-full min-h-0">
       {/* Palette */}
       <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
@@ -637,6 +658,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                   <p className="mt-1 text-xs text-text-lo">
                     Leave blank to preserve the image's own aspect ratio. A set height crops to fill (not supported in Outlook desktop — it stretches instead).
                   </p>
+                </Field>
+                <Field label="Shape">
+                  <select value={selected.shape || "square"} onChange={(e) => updateBlock(selected.id, { shape: e.target.value as ImageShape })} className={inputClass}>
+                    <option value="square">Square</option>
+                    <option value="rounded">Rounded corners</option>
+                    <option value="circle">Circle</option>
+                  </select>
+                  <p className="mt-1 text-xs text-text-lo">Circle works best on a square photo (equal width and height) — otherwise it renders as a pill.</p>
                 </Field>
                 <Field label="Align">
                   <select value={selected.align} onChange={(e) => updateBlock(selected.id, { align: e.target.value as Align })} className={inputClass}>

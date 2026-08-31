@@ -26,7 +26,11 @@ function serializeBlock(block: Block, templateId?: string): string {
     case "image": {
       const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" style="display:block;width:${block.width}px;max-width:100%;border:0;" />`;
       const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
-      const content = href ? `<a href="${href}">${img}</a>` : img;
+      // The anchor needs its own explicit size matching the image — without one, wrapping a
+      // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it
+      // then stretches to fill the <td> (which itself expands to the table's width:100%), so the
+      // clickable area extends well past the visible image into any empty space beside it.
+      const content = href ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;">${img}</a>` : img;
       return `<tr><td style="${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 

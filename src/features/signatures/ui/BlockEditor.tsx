@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, closestCenter, useDraggable, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import MediaPicker from "@/shared/ui/MediaPicker";
@@ -38,6 +38,12 @@ function parseContainerId(id: string): ColumnPath | null | undefined {
   const m = /^container:(.+):(\d+)$/.exec(id);
   return m ? { columnsId: m[1], colIndex: Number(m[2]) } : undefined;
 }
+
+// Draggable id for a palette entry — distinguishes "dragging a new block in from the palette"
+// from "reordering/moving an existing block" in onDragEnd, since both share one DndContext.
+const PALETTE_DRAG_PREFIX = "palette:";
+const paletteDragId = (type: Block["type"]) => `${PALETTE_DRAG_PREFIX}${type}`;
+const paletteTypeFromDragId = (id: string): Block["type"] | null => (id.startsWith(PALETTE_DRAG_PREFIX) ? (id.slice(PALETTE_DRAG_PREFIX.length) as Block["type"]) : null);
 
 export interface BlockEditorHandle {
   getExport: () => { blocks: Block[]; html: string };
@@ -177,15 +183,24 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
+  // A live Tiptap instance is mounted while a text block is selected — dragging from anywhere on
+  // its body would hijack click-and-drag text selection (needed for the bubble menu), so only
+  // the handle drags in that case. Every other block (or a text block when not being edited)
+  // drags from anywhere; PointerSensor's 8px activation distance already tells a genuine drag
+  // apart from a plain click, so this doesn't fight the onClick-to-select below it.
+  const wholeBodyDraggable = !(block.type === "text" && selected);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       onClick={() => actions.onSelect(block.id)}
+      {...(wholeBodyDraggable ? attributes : {})}
+      {...(wholeBodyDraggable ? listeners : {})}
       // Notion-style chrome: no permanent box, just a hover-revealed drag handle/delete and a
       // left accent bar on selection — a permanent bordered card per block is what reads as
       // "basic" as much as anything about the text editor itself.
-      className={`group relative flex cursor-pointer items-start gap-1 rounded-md py-1 pr-1 transition-colors ${
+      className={`group relative flex items-start gap-1 rounded-md py-1 pr-1 transition-colors ${wholeBodyDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
         selected ? "bg-brand-500/5" : "hover:bg-surface-2/60"
       }`}
     >
@@ -193,6 +208,7 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
+        title="Drag to move"
         className="mt-1 shrink-0 cursor-grab text-text-lo opacity-0 transition-opacity hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
       >
         <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
@@ -270,6 +286,28 @@ function BlockList({ blocks, path, actions, nested }: { blocks: Block[]; path: C
   );
 }
 
+/** One entry in the main sidebar palette — click still appends to the end of the canvas
+ * (unchanged), but it's now also a drag source: pick it up and drop it anywhere in the canvas or
+ * directly into a column to insert it right there, via the same onDragEnd the block-move/reorder
+ * logic uses (distinguished by the `palette:` id prefix). */
+function PaletteButton({ type, label, icon, onClick }: { type: Block["type"]; label: string; icon: string; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: paletteDragId(type) });
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2 ${
+        isDragging ? "cursor-grabbing opacity-50" : "cursor-grab"
+      }`}
+    >
+      <Icon icon={icon} className="h-4 w-4 text-brand-600" />
+      {label}
+    </button>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -288,6 +326,10 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const [blocks, setBlocks] = useState<Block[]>(() => (initialBlocks && initialBlocks.length > 0 ? initialBlocks : wrapLegacyHtml(initialHtml)));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
+  // Label shown in the DragOverlay while dragging a *new* block in from the palette — sortable
+  // items already get their own transform-based preview from useSortable, so this only needs to
+  // cover the palette case (which isn't part of any SortableContext).
+  const [activeDragLabel, setActiveDragLabel] = useState<string | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -451,14 +493,38 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const paletteType = paletteTypeFromDragId(String(event.active.id));
+    setActiveDragLabel(paletteType ? PALETTE.find((p) => p.type === paletteType)?.label ?? null : null);
+  };
+
   // Single DndContext for the whole tree (top-level canvas + every column) — dnd-kit's standard
   // multi-container pattern, which is what lets a block move between lists instead of only
   // reordering within the one it started in.
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragLabel(null);
     const { active, over } = event;
     if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Dragging a new block in from the palette, rather than moving/reordering an existing one.
+    const paletteType = paletteTypeFromDragId(activeId);
+    if (paletteType) {
+      const parsedContainer = parseContainerId(overId);
+      const overIsContainer = parsedContainer !== undefined;
+      const toPath = overIsContainer ? parsedContainer : findContainerPath(blocks, overId);
+      if (toPath === undefined) return;
+      const newBlock = createBlock(paletteType);
+      setBlocks((prev) => {
+        const targetList = getListAt(prev, toPath);
+        const targetIndex = overIsContainer ? targetList.length : targetList.findIndex((b) => b.id === overId);
+        return insertIntoList(prev, toPath, newBlock, targetIndex === -1 ? targetList.length : targetIndex);
+      });
+      setSelectedId(newBlock.id);
+      return;
+    }
+
     if (activeId === overId) return;
 
     const fromPath = findContainerPath(blocks, activeId);
@@ -490,21 +556,15 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex h-full min-h-0">
       {/* Palette */}
       <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Add block</p>
+        <p className="mb-2 text-xs text-text-lo">Click to add, or drag onto the canvas — even directly into a column.</p>
         <div className="space-y-2">
           {PALETTE.map((p) => (
-            <button
-              key={p.type}
-              onClick={() => addBlock(p.type)}
-              className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
-            >
-              <Icon icon={p.icon} className="h-4 w-4 text-brand-600" />
-              {p.label}
-            </button>
+            <PaletteButton key={p.type} type={p.type} label={p.label} icon={p.icon} onClick={() => addBlock(p.type)} />
           ))}
         </div>
       </div>
@@ -765,6 +825,15 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
           setPickerOpenFor(null);
         }}
       />
+
+      <DragOverlay>
+        {activeDragLabel && (
+          <div className="flex items-center gap-2 rounded-lg border border-brand-500 bg-surface px-3 py-2 text-sm font-medium text-text-hi shadow-lg">
+            <Icon icon="solar:add-circle-broken" className="h-4 w-4 text-brand-600" />
+            {activeDragLabel}
+          </div>
+        )}
+      </DragOverlay>
     </div>
     </DndContext>
   );

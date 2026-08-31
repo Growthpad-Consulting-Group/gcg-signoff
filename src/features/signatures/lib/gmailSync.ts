@@ -13,13 +13,16 @@ import { google } from "googleapis";
  *
  * Requires domain-wide delegation: a Google Cloud service account authorized in the Workspace
  * Admin console (Security → API controls → Domain-wide Delegation) for the
- * `https://www.googleapis.com/auth/gmail.settings.sharing` scope. See docs/ARCHITECTURE.md for
- * the setup steps. This is an internal admin tool for one domain, so it does NOT need Google's
- * public OAuth app verification/security-assessment process — that only applies to apps
- * requesting consent from accounts outside your own organization.
+ * `https://www.googleapis.com/auth/gmail.settings.basic` scope — Google specifically allows
+ * the `signature` field of sendAs.patch to be updated with this less-sensitive scope, unlike
+ * every other field on that resource (delegates, forwarding, etc.), which needs the sensitive
+ * `gmail.settings.sharing` scope instead. See docs/ARCHITECTURE.md for the setup steps. This
+ * is an internal admin tool for one domain, so it does NOT need Google's public OAuth app
+ * verification/security-assessment process — that only applies to apps requesting consent
+ * from accounts outside your own organization.
  */
 
-const SCOPES = ["https://www.googleapis.com/auth/gmail.settings.sharing"];
+const SCOPES = ["https://www.googleapis.com/auth/gmail.settings.basic"];
 
 function getServiceAccountCredentials() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;

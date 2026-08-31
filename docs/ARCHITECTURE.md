@@ -115,7 +115,10 @@ for domain-wide delegation:
    in the app's env.
 3. Workspace Admin console → Security → API controls → Domain-wide Delegation → Add new →
    paste the service account's numeric Client ID → Scope:
-   `https://www.googleapis.com/auth/gmail.settings.sharing`.
+   `https://www.googleapis.com/auth/gmail.settings.basic` — this narrower scope is
+   deliberate: Google specifically allows the `signature` field of `sendAs.patch` to be
+   updated with it, unlike every other field on that resource (delegates, forwarding, etc.),
+   which needs the more sensitive `gmail.settings.sharing` scope instead.
 
 This is an internal tool acting only within your own domain, so it does **not** need Google's
 public OAuth app verification/security-assessment process — that process exists for apps

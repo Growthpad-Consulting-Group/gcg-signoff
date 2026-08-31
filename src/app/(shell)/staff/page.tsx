@@ -303,6 +303,9 @@ function StaffPageInner() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [syncingGmailId, setSyncingGmailId] = useState<string | null>(null);
+  const [copyTarget, setCopyTarget] = useState<Staff | null>(null);
+  const [copyPreviewHtml, setCopyPreviewHtml] = useState<string | null>(null);
+  const [loadingCopyPreview, setLoadingCopyPreview] = useState(false);
   const [syncingAllGmail, setSyncingAllGmail] = useState(false);
   const [editTarget, setEditTarget] = useState<Staff | null>(null);
   const [editForm, setEditForm] = useState<StaffForm | null>(null);
@@ -527,15 +530,24 @@ function StaffPageInner() {
     load();
   };
 
-  const copySignature = async (person: Staff) => {
+  const openCopyPreview = async (person: Staff) => {
+    setCopyTarget(person);
+    setCopyPreviewHtml(null);
+    setLoadingCopyPreview(true);
     const res = await fetch(`/api/staff/${person.id}/signature-html`);
+    setLoadingCopyPreview(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       toast.error(body.error || "Failed to load signature");
+      setCopyTarget(null);
       return;
     }
     const { html } = await res.json();
+    setCopyPreviewHtml(html);
+  };
 
+  const copySignature = async () => {
+    if (!copyPreviewHtml) return;
     try {
       // Rich-content copy so pasting into a webmail/mail-client signature field lands as
       // formatted HTML, not a wall of raw markup — the manual-paste path for domains with no
@@ -543,14 +555,15 @@ function StaffPageInner() {
       if (navigator.clipboard.write) {
         await navigator.clipboard.write([
           new ClipboardItem({
-            "text/html": new Blob([html], { type: "text/html" }),
-            "text/plain": new Blob([html], { type: "text/plain" }),
+            "text/html": new Blob([copyPreviewHtml], { type: "text/html" }),
+            "text/plain": new Blob([copyPreviewHtml], { type: "text/plain" }),
           }),
         ]);
       } else {
-        await navigator.clipboard.writeText(html);
+        await navigator.clipboard.writeText(copyPreviewHtml);
       }
       toast.success("Signature copied — paste into their mailbox's signature settings");
+      setCopyTarget(null);
     } catch {
       toast.error("Couldn't access clipboard — try again or check browser permissions");
     }
@@ -786,7 +799,7 @@ function StaffPageInner() {
                         </button>
                         {assignment && (
                           <button
-                            onClick={() => copySignature(person)}
+                            onClick={() => openCopyPreview(person)}
                             className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
                             title="Copy signature HTML — for manually pasting into a mailbox that isn't auto-deployed (e.g. no Google Workspace)"
                           >
@@ -850,6 +863,30 @@ function StaffPageInner() {
             </Button>
           </div>
         )}
+      </SimpleModal>
+
+      <SimpleModal
+        isOpen={!!copyTarget}
+        onClose={() => setCopyTarget(null)}
+        title={`Copy signature — ${copyTarget?.full_name ?? ""}`}
+        subtitle="Paste this into their mailbox's signature settings (webmail or mail client)."
+        width="max-w-lg"
+      >
+        <div className="space-y-4">
+          <div className="min-h-[120px] rounded-lg border border-app-border bg-white p-4 text-black">
+            {loadingCopyPreview ? (
+              <p className="text-sm text-gray-400">Loading preview…</p>
+            ) : copyPreviewHtml ? (
+              <div dangerouslySetInnerHTML={{ __html: copyPreviewHtml }} />
+            ) : (
+              <p className="text-sm text-gray-400">No preview available.</p>
+            )}
+          </div>
+          <Button className="w-full" onClick={copySignature} disabled={!copyPreviewHtml || loadingCopyPreview}>
+            <Icon icon="solar:copy-broken" className="h-4 w-4" />
+            Copy signature
+          </Button>
+        </div>
       </SimpleModal>
 
       <ConfirmDialog

@@ -55,6 +55,8 @@ export default function TemplateEditorPage() {
   const [previewMounted, setPreviewMounted] = useState(false);
   const [previewAnimateIn, setPreviewAnimateIn] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const loadedRef = useRef(false);
   const autosaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<BlockEditorHandle>(null);
@@ -247,6 +249,25 @@ export default function TemplateEditorPage() {
               )}
             </span>
           )}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => editorRef.current?.undo()}
+              disabled={!canUndo}
+              title="Undo (Ctrl/Cmd+Z)"
+              className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <Icon icon="solar:undo-left-broken" className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => editorRef.current?.redo()}
+              disabled={!canRedo}
+              title="Redo (Ctrl/Cmd+Shift+Z)"
+              className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <Icon icon="solar:undo-right-broken" className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="h-5 w-px bg-app-border" />
           <button
             onClick={() => setShowHistory(true)}
             title="Version history"
@@ -289,6 +310,10 @@ export default function TemplateEditorPage() {
           onChange={(_blocks, html) => {
             setPreviewHtml(html);
             scheduleAutosave();
+          }}
+          onHistoryChange={(undoAvailable, redoAvailable) => {
+            setCanUndo(undoAvailable);
+            setCanRedo(redoAvailable);
           }}
         />
       </div>

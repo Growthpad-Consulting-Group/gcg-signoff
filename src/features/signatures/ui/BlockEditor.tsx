@@ -68,6 +68,8 @@ const paletteTypeFromDragId = (id: string): Block["type"] | null => (id.startsWi
 
 export interface BlockEditorHandle {
   getExport: () => { blocks: Block[]; html: string };
+  undo: () => void;
+  redo: () => void;
 }
 
 interface BlockEditorProps {
@@ -75,6 +77,10 @@ interface BlockEditorProps {
   initialBlocks: Block[] | null;
   initialHtml: string;
   onChange: (blocks: Block[], html: string) => void;
+  // Lets the page render its own Undo/Redo buttons in the top toolbar (alongside History/
+  // Delete/Preview/Save) rather than as an isolated, easy-to-miss pair of icons floating above
+  // the canvas with nothing else around them for context.
+  onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
 const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
@@ -278,7 +284,7 @@ function BlockList({ blocks, path, actions, nested }: { blocks: Block[]; path: C
     <div ref={setNodeRef} className={`rounded-lg transition-colors ${isOver ? "bg-brand-500/5" : ""}`}>
       {blocks.length === 0 ? (
         <p className={nested ? "py-3 text-center text-xs text-text-lo" : "py-12 text-center text-sm text-text-lo"}>
-          {nested ? "Empty column" : "Add a block from the panel to get started."}
+          {nested ? "Empty column — drag a block here, or use the icons below." : "Click or drag a block from the panel to get started."}
         </p>
       ) : (
         <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
@@ -341,7 +347,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = "w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500";
 
 const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function BlockEditor(
-  { templateId, initialBlocks, initialHtml, onChange },
+  { templateId, initialBlocks, initialHtml, onChange, onHistoryChange },
   ref
 ) {
   const [blocks, setBlocks] = useState<Block[]>(() => (initialBlocks && initialBlocks.length > 0 ? initialBlocks : wrapLegacyHtml(initialHtml)));
@@ -403,10 +409,18 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks]);
 
+  const onHistoryChangeRef = useRef(onHistoryChange);
+  onHistoryChangeRef.current = onHistoryChange;
+  useEffect(() => {
+    onHistoryChangeRef.current?.(historyRef.current.length > 0, futureRef.current.length > 0);
+  }, [historyVersion]);
+
   const selected = selectedId ? findBlockById(blocks, selectedId) : null;
 
   useImperativeHandle(ref, () => ({
     getExport: () => ({ blocks, html: serializeBlocks(blocks, templateId) }),
+    undo,
+    redo,
   }));
 
   // Fires once immediately on mount (so the page's preview/autosave state reflects the initial
@@ -593,24 +607,6 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       {/* Canvas */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
         <div className="mx-auto w-full max-w-[600px]">
-          <div className="mb-2 flex items-center justify-end gap-1" data-history-version={historyVersion}>
-            <button
-              onClick={undo}
-              disabled={historyRef.current.length === 0}
-              title="Undo (Ctrl/Cmd+Z)"
-              className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <Icon icon="solar:undo-left-broken" className="h-4 w-4" />
-            </button>
-            <button
-              onClick={redo}
-              disabled={futureRef.current.length === 0}
-              title="Redo (Ctrl/Cmd+Shift+Z)"
-              className="rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30"
-            >
-              <Icon icon="solar:undo-right-broken" className="h-4 w-4" />
-            </button>
-          </div>
           <div className="rounded-lg bg-surface p-6 shadow-sm">
             <BlockList blocks={blocks} path={null} actions={actions} />
           </div>

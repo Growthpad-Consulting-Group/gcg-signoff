@@ -53,16 +53,27 @@ export default function VersionHistoryModal({ templateId, isOpen, onClose, onRes
           <p className="text-sm text-text-lo">No saved versions yet — versions are captured each time you click Save.</p>
         )}
         {versions !== null && versions.length > 0 && (
-          <ul className="space-y-2">
-            {versions.map((v) => (
-              <li key={v.id} className="flex items-center justify-between rounded-lg border border-app-border bg-surface-2 px-3 py-2">
-                <span className="flex items-center gap-2 text-sm text-text-hi">
-                  <Icon icon="solar:history-broken" className="h-4 w-4 text-text-lo" />
-                  {formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}
+          // Capped height + its own scroll region — this list has no upper bound (a version is
+          // snapshotted on every save), so left unconstrained the modal itself just grew taller
+          // and taller instead of scrolling.
+          <ul className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            {versions.map((v, i) => (
+              <li
+                key={v.id}
+                className="flex items-center justify-between rounded-lg border border-app-border bg-surface-2 px-3 py-2.5 transition-colors hover:bg-surface"
+              >
+                <span className="flex items-center gap-2.5 text-sm text-text-hi">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-500/10 text-brand-600">
+                    <Icon icon="solar:history-broken" className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="flex flex-col">
+                    <span>{formatDistanceToNow(new Date(v.created_at), { addSuffix: true })}</span>
+                    {i === 0 && <span className="text-xs text-text-lo">Most recent</span>}
+                  </span>
                 </span>
                 <button
                   onClick={() => setRestoreTarget(v)}
-                  className="text-xs font-medium text-brand-600 hover:underline"
+                  className="shrink-0 rounded-lg border border-app-border px-2.5 py-1.5 text-xs font-medium text-text-hi transition-colors hover:border-brand-500 hover:text-brand-600"
                 >
                   Restore
                 </button>

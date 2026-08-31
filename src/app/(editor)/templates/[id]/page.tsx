@@ -10,6 +10,7 @@ import { lintSignatureHtml } from "@/features/signatures/lib/lintSignatureHtml";
 import BlockEditor, { BlockEditorHandle } from "@/features/signatures/ui/BlockEditor";
 import { Block } from "@/features/signatures/lib/blocks";
 import VersionHistoryModal from "@/features/signatures/ui/VersionHistoryModal";
+import TooltipIconButton from "@/shared/ui/TooltipIconButton";
 
 const PREVIEW_STAFF: MergeTagSource = {
   full_name: "Jane Wanjiru",
@@ -210,13 +211,8 @@ export default function TemplateEditorPage() {
           builders. */}
       <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-app-border bg-surface px-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button
-            onClick={() => router.push("/templates")}
-            title="Back to templates"
-            className="shrink-0 rounded-lg p-1.5 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
-          >
-            <Icon icon="solar:arrow-left-broken" className="h-5 w-5" />
-          </button>
+          <TooltipIconButton label="Back to templates" icon="solar:arrow-left-broken" onClick={() => router.push("/templates")} className="shrink-0" />
+          <div className="h-5 w-px shrink-0 bg-app-border" />
           <div className="min-w-0 flex-1">
             <input
               value={name}
@@ -249,39 +245,26 @@ export default function TemplateEditorPage() {
               )}
             </span>
           )}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => editorRef.current?.undo()}
-              disabled={!canUndo}
-              title="Undo (Ctrl/Cmd+Z)"
-              className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <Icon icon="solar:undo-left-broken" className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => editorRef.current?.redo()}
-              disabled={!canRedo}
-              title="Redo (Ctrl/Cmd+Shift+Z)"
-              className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <Icon icon="solar:undo-right-broken" className="h-4 w-4" />
-            </button>
-          </div>
+          <TooltipIconButton
+            label="Undo (Ctrl/Cmd+Z)"
+            icon="solar:undo-left-broken"
+            onClick={() => editorRef.current?.undo()}
+            disabled={!canUndo}
+          />
+          <TooltipIconButton
+            label="Redo (Ctrl/Cmd+Shift+Z)"
+            icon="solar:undo-right-broken"
+            onClick={() => editorRef.current?.redo()}
+            disabled={!canRedo}
+          />
           <div className="h-5 w-px bg-app-border" />
-          <button
-            onClick={() => setShowHistory(true)}
-            title="Version history"
-            className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
-          >
-            <Icon icon="solar:history-broken" className="h-4 w-4" />
-          </button>
-          <button
+          <TooltipIconButton label="Version history" icon="solar:history-broken" onClick={() => setShowHistory(true)} />
+          <TooltipIconButton
+            label="Delete template"
+            icon="solar:trash-bin-trash-broken"
             onClick={() => setShowDeleteConfirm(true)}
-            title="Delete template"
-            className="rounded-lg p-2 text-text-lo transition-colors hover:bg-status-danger/10 hover:text-status-danger"
-          >
-            <Icon icon="solar:trash-bin-trash-broken" className="h-4 w-4" />
-          </button>
+            className="hover:!bg-status-danger/10 hover:!text-status-danger"
+          />
           <button
             onClick={openPreview}
             className="inline-flex items-center gap-1.5 rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi transition-colors hover:bg-surface-2"

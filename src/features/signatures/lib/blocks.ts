@@ -18,6 +18,7 @@ export interface ImageBlock {
   src: string;
   alt: string;
   width: number; // px
+  height?: number; // px — unset means auto (preserve source aspect ratio)
   align: Align;
   linkUrl?: string;
   linkLabel?: string;
@@ -192,4 +193,79 @@ export function updateColumnList(blocks: Block[], path: ColumnPath, fn: (col: Bl
     if (b.type === "columns") return { ...b, columns: b.columns.map((col) => updateColumnList(col, path, fn)) };
     return b;
   });
+}
+
+/** Reads the block list at `path` — the top level (`path: null`) or one specific column. */
+export function getListAt(blocks: Block[], path: ColumnPath | null): Block[] {
+  if (!path) return blocks;
+  const owner = findBlockById(blocks, path.columnsId);
+  return owner?.type === "columns" ? owner.columns[path.colIndex] || [] : [];
+}
+
+/** Finds which list a block id lives in — `null` for the top level, a `ColumnPath` for a
+ * column, or `undefined` if the id isn't a block anywhere in the tree. Needed for cross-column
+ * dragging, where the drop target's container isn't known ahead of time. */
+export function findContainerPath(blocks: Block[], id: string, path: ColumnPath | null = null): ColumnPath | null | undefined {
+  for (const b of blocks) {
+    if (b.id === id) return path;
+    if (b.type === "columns") {
+      for (let i = 0; i < b.columns.length; i++) {
+        const found = findContainerPath(b.columns[i], id, { columnsId: b.id, colIndex: i });
+        if (found !== undefined) return found;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Like `removeBlockById`, but also hands back the removed block so it can be re-inserted
+ * elsewhere (cross-column drag, essentially "cut"). */
+export function removeBlockWithResult(blocks: Block[], id: string): { result: Block[]; removed: Block | null } {
+  let removed: Block | null = null;
+  const result = blocks
+    .filter((b) => {
+      if (b.id === id) {
+        removed = b;
+        return false;
+      }
+      return true;
+    })
+    .map((b) => {
+      if (removed || b.type !== "columns") return b;
+      const columns = b.columns.map((col) => {
+        const r = removeBlockWithResult(col, id);
+        if (r.removed) removed = r.removed;
+        return r.result;
+      });
+      return { ...b, columns };
+    });
+  return { result, removed };
+}
+
+/** Inserts `block` at `index` in the list at `path` (top level or a specific column) —
+ * `index` beyond the list's length appends. The "paste" half of a cross-column move. */
+export function insertIntoList(blocks: Block[], path: ColumnPath | null, block: Block, index: number): Block[] {
+  const insertAt = (list: Block[]) => {
+    const next = [...list];
+    next.splice(Math.min(index, next.length), 0, block);
+    return next;
+  };
+  if (!path) return insertAt(blocks);
+  return updateColumnList(blocks, path, insertAt);
+}
+
+function sameColumnPath(a: ColumnPath | null, b: ColumnPath | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.columnsId === b.columnsId && a.colIndex === b.colIndex;
+}
+
+export { sameColumnPath };
+
+/** Deep-clones a block with fresh ids throughout (including anything nested inside a `columns`
+ * block), so the clone and the original never share identity. */
+export function cloneBlockWithNewIds(block: Block): Block {
+  if (block.type === "columns") {
+    return { ...block, id: newBlockId(), columns: block.columns.map((col) => col.map(cloneBlockWithNewIds)) };
+  }
+  return { ...block, id: newBlockId() };
 }

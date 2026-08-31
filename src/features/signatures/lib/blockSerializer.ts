@@ -24,13 +24,20 @@ function serializeBlock(block: Block, templateId?: string): string {
       return `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#374151;">${block.html}</td></tr>`;
 
     case "image": {
-      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" style="display:block;width:${block.width}px;max-width:100%;border:0;" />`;
+      // object-fit crops to the given height while filling the width — supported by Gmail,
+      // Apple Mail, and mobile clients, but not Outlook desktop (its Word-based renderer just
+      // stretches/distorts instead of cropping). No workaround for that short of shipping a
+      // pre-cropped image; a known, unavoidable email-client gap, not a bug here.
+      const heightStyle = block.height ? `height:${block.height}px;object-fit:cover;` : "";
+      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border:0;" />`;
       const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
       // The anchor needs its own explicit size matching the image — without one, wrapping a
       // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it
       // then stretches to fill the <td> (which itself expands to the table's width:100%), so the
       // clickable area extends well past the visible image into any empty space beside it.
-      const content = href ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;">${img}</a>` : img;
+      const content = href
+        ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${img}</a>`
+        : img;
       return `<tr><td style="${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 

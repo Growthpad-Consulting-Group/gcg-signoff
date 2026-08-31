@@ -2,8 +2,8 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
-import { DndContext, DragEndEvent, PointerSensor, closestCenter, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useDroppable, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import MediaPicker from "@/shared/ui/MediaPicker";
 import RichTextEditor from "@/features/signatures/ui/RichTextEditor";
@@ -12,15 +12,32 @@ import {
   Block,
   ColumnPath,
   ColumnStyle,
+  cloneBlockWithNewIds,
   createBlock,
   findBlockById,
+  findContainerPath,
+  getListAt,
   insertAfterId,
+  insertIntoList,
   removeBlockById,
+  removeBlockWithResult,
+  sameColumnPath,
   updateBlockById,
   updateColumnList,
   wrapLegacyHtml,
 } from "@/features/signatures/lib/blocks";
 import { serializeBlocks } from "@/features/signatures/lib/blockSerializer";
+
+// dnd-kit droppable ids for each list's *container* (distinct from any block's own id) — needed
+// so an empty column, which otherwise has nothing to be "over", is still a valid drop target,
+// and so onDragEnd can tell which list a drop landed in when it wasn't dropped on an item.
+const ROOT_CONTAINER_ID = "container:root";
+const columnContainerId = (columnsId: string, colIndex: number) => `container:${columnsId}:${colIndex}`;
+function parseContainerId(id: string): ColumnPath | null | undefined {
+  if (id === ROOT_CONTAINER_ID) return null;
+  const m = /^container:(.+):(\d+)$/.exec(id);
+  return m ? { columnsId: m[1], colIndex: Number(m[2]) } : undefined;
+}
 
 export interface BlockEditorHandle {
   getExport: () => { blocks: Block[]; html: string };
@@ -55,6 +72,7 @@ interface ListActions {
   templateId: string;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onTextChange: (id: string, html: string) => void;
   onInsertBlockAfter: (id: string, type: Block["type"]) => void;
   onReorder: (path: ColumnPath | null, oldIndex: number, newIndex: number) => void;
@@ -79,7 +97,12 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
     case "image":
       return block.src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={block.src} alt={block.alt} style={{ width: block.width, maxWidth: "100%" }} className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""} />
+        <img
+          src={block.src}
+          alt={block.alt}
+          style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, maxWidth: "100%" }}
+          className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
+        />
       ) : (
         <div className="flex h-16 w-24 items-center justify-center rounded border border-dashed border-app-border text-text-lo">
           <Icon icon="solar:gallery-broken" className="h-5 w-5" />
@@ -177,50 +200,57 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
       <div className={`min-w-0 flex-1 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
         <BlockPreview block={block} editingText={selected} actions={actions} />
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          actions.onRemove(block.id);
-        }}
-        className="mt-1 shrink-0 text-text-lo opacity-0 transition-opacity hover:text-status-danger group-hover:opacity-100"
-      >
-        <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
-      </button>
+      <div className="mt-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onDuplicate(block.id);
+          }}
+          title="Duplicate"
+          className="text-text-lo hover:text-text-hi"
+        >
+          <Icon icon="solar:copy-broken" className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            actions.onRemove(block.id);
+          }}
+          title="Delete"
+          className="text-text-lo hover:text-status-danger"
+        >
+          <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
 
 /** Renders one block list — either the top-level canvas (`path: null`) or one column of a
- * `columns` block (`path` set) — with its own drag-and-drop scope. Recurses via BlockPreview's
- * "columns" case, so nesting is just "a BlockList inside a BlockList". */
+ * `columns` block (`path` set). Recurses via BlockPreview's "columns" case, so nesting is just "a
+ * BlockList inside a BlockList". Drag-and-drop is *not* scoped here — one `DndContext` at the
+ * `BlockEditor` root spans every list (this is dnd-kit's standard multi-container pattern), so a
+ * block can be dragged between lists, not just reordered within one. `useDroppable` on the
+ * container itself (rather than relying only on item-level sortable ids) is what makes an empty
+ * column — which otherwise has no item to be "over" — still a valid drop target. */
 function BlockList({ blocks, path, actions, nested }: { blocks: Block[]; path: ColumnPath | null; actions: ListActions; nested?: boolean }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = blocks.findIndex((b) => b.id === active.id);
-    const newIndex = blocks.findIndex((b) => b.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    actions.onReorder(path, oldIndex, newIndex);
-  };
+  const containerId = path ? columnContainerId(path.columnsId, path.colIndex) : ROOT_CONTAINER_ID;
+  const { setNodeRef, isOver } = useDroppable({ id: containerId });
 
   return (
-    <div>
+    <div ref={setNodeRef} className={`rounded-lg transition-colors ${isOver ? "bg-brand-500/5" : ""}`}>
       {blocks.length === 0 ? (
         <p className={nested ? "py-3 text-center text-xs text-text-lo" : "py-12 text-center text-sm text-text-lo"}>
           {nested ? "Empty column" : "Add a block from the panel to get started."}
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1">
-              {blocks.map((block) => (
-                <SortableBlock key={block.id} block={block} actions={actions} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+        <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-1">
+            {blocks.map((block) => (
+              <SortableBlock key={block.id} block={block} actions={actions} />
+            ))}
+          </div>
+        </SortableContext>
       )}
       {nested && (
         <div className="mt-1 flex flex-wrap gap-0.5 border-t border-app-border pt-1">
@@ -369,6 +399,17 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     if (selectedId === id) setSelectedId(null);
   };
 
+  const duplicateBlock = (id: string) => {
+    const block = findBlockById(blocks, id);
+    if (!block) return;
+    const clone = cloneBlockWithNewIds(block);
+    setBlocks((prev) => {
+      const { result, inserted } = insertAfterId(prev, id, clone);
+      return inserted ? result : [...prev, clone];
+    });
+    setSelectedId(clone.id);
+  };
+
   // Splices a new block right after `afterId`, wherever it is in the tree — used by the "/"
   // slash-command menu inside a text block, so a block can be added without leaving the writing
   // flow for the side palette (or the mini palette, if the text block is inside a column).
@@ -398,13 +439,58 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     templateId,
     onSelect: setSelectedId,
     onRemove: removeBlock,
+    onDuplicate: duplicateBlock,
     onTextChange: (id, html) => updateBlock(id, { html }),
     onInsertBlockAfter: insertBlockAfter,
     onReorder: reorderList,
     onAddBlock: addBlockToList,
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Single DndContext for the whole tree (top-level canvas + every column) — dnd-kit's standard
+  // multi-container pattern, which is what lets a block move between lists instead of only
+  // reordering within the one it started in.
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
+
+    const fromPath = findContainerPath(blocks, activeId);
+    if (fromPath === undefined) return;
+
+    const parsedContainer = parseContainerId(overId);
+    const overIsContainer = parsedContainer !== undefined;
+    const toPath = overIsContainer ? parsedContainer : findContainerPath(blocks, overId);
+    if (toPath === undefined) return;
+
+    if (sameColumnPath(fromPath, toPath)) {
+      if (overIsContainer) return; // dropped on empty space in its own list — nothing to reorder against
+      const list = getListAt(blocks, fromPath);
+      const oldIndex = list.findIndex((b) => b.id === activeId);
+      const newIndex = list.findIndex((b) => b.id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+      reorderList(fromPath, oldIndex, newIndex);
+      return;
+    }
+
+    // Moving to a different list entirely — remove from the source, insert into the target.
+    setBlocks((prev) => {
+      const { result, removed } = removeBlockWithResult(prev, activeId);
+      if (!removed) return prev;
+      const targetList = getListAt(result, toPath);
+      const targetIndex = overIsContainer ? targetList.length : targetList.findIndex((b) => b.id === overId);
+      return insertIntoList(result, toPath, removed, targetIndex === -1 ? targetList.length : targetIndex);
+    });
+  };
+
   return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
     <div className="flex h-full min-h-0">
       {/* Palette */}
       <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
@@ -479,6 +565,18 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                 </Field>
                 <Field label="Width (px)">
                   <input type="number" value={selected.width} onChange={(e) => updateBlock(selected.id, { width: Number(e.target.value) || 0 })} className={inputClass} />
+                </Field>
+                <Field label="Height (px)">
+                  <input
+                    type="number"
+                    value={selected.height ?? ""}
+                    onChange={(e) => updateBlock(selected.id, { height: e.target.value ? Number(e.target.value) : undefined })}
+                    placeholder="Auto"
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-text-lo">
+                    Leave blank to preserve the image's own aspect ratio. A set height crops to fill (not supported in Outlook desktop — it stretches instead).
+                  </p>
                 </Field>
                 <Field label="Align">
                   <select value={selected.align} onChange={(e) => updateBlock(selected.id, { align: e.target.value as Align })} className={inputClass}>
@@ -668,6 +766,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         }}
       />
     </div>
+    </DndContext>
   );
 });
 

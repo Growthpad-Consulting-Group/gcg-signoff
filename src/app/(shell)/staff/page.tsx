@@ -306,6 +306,7 @@ function StaffPageInner() {
   const [copyTarget, setCopyTarget] = useState<Staff | null>(null);
   const [copyPreviewHtml, setCopyPreviewHtml] = useState<string | null>(null);
   const [loadingCopyPreview, setLoadingCopyPreview] = useState(false);
+  const [copyView, setCopyView] = useState<"preview" | "html">("preview");
   const [syncingAllGmail, setSyncingAllGmail] = useState(false);
   const [editTarget, setEditTarget] = useState<Staff | null>(null);
   const [editForm, setEditForm] = useState<StaffForm | null>(null);
@@ -533,6 +534,7 @@ function StaffPageInner() {
   const openCopyPreview = async (person: Staff) => {
     setCopyTarget(person);
     setCopyPreviewHtml(null);
+    setCopyView("preview");
     setLoadingCopyPreview(true);
     const res = await fetch(`/api/staff/${person.id}/signature-html`);
     setLoadingCopyPreview(false);
@@ -873,15 +875,41 @@ function StaffPageInner() {
         width="max-w-3xl"
       >
         <div className="space-y-4">
-          <div className="min-h-[120px] overflow-x-auto rounded-lg border border-app-border bg-white p-4 text-black">
-            {loadingCopyPreview ? (
-              <p className="text-sm text-gray-400">Loading preview…</p>
-            ) : copyPreviewHtml ? (
-              <div dangerouslySetInnerHTML={{ __html: copyPreviewHtml }} />
-            ) : (
-              <p className="text-sm text-gray-400">No preview available.</p>
-            )}
+          <div className="inline-flex rounded-lg border border-app-border p-0.5">
+            <button
+              onClick={() => setCopyView("preview")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                copyView === "preview" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+              }`}
+            >
+              Preview
+            </button>
+            <button
+              onClick={() => setCopyView("html")}
+              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                copyView === "html" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+              }`}
+            >
+              HTML source
+            </button>
           </div>
+
+          {copyView === "preview" ? (
+            <div className="min-h-[120px] overflow-x-auto rounded-lg border border-app-border bg-white p-4 text-black">
+              {loadingCopyPreview ? (
+                <p className="text-sm text-gray-400">Loading preview…</p>
+              ) : copyPreviewHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: copyPreviewHtml }} />
+              ) : (
+                <p className="text-sm text-gray-400">No preview available.</p>
+              )}
+            </div>
+          ) : (
+            <pre className="max-h-80 overflow-auto rounded-lg border border-app-border bg-surface-2 p-4 text-xs text-text-hi">
+              <code>{loadingCopyPreview ? "Loading…" : copyPreviewHtml || "No HTML available."}</code>
+            </pre>
+          )}
+
           <Button className="w-full" onClick={copySignature} disabled={!copyPreviewHtml || loadingCopyPreview}>
             <Icon icon="solar:copy-broken" className="h-4 w-4" />
             Copy signature

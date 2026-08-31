@@ -140,7 +140,9 @@ export default function TemplateEditorPage() {
     }
 
     if (!silent) {
-      toast.success("Template saved. Assigned staff will re-deploy on next sync.");
+      toast.success(
+        "Template saved. Gateway-deployed staff will pick it up on their next outgoing email; Gmail-synced staff are being updated now."
+      );
     } else {
       setAutosaveStatus("saved");
     }

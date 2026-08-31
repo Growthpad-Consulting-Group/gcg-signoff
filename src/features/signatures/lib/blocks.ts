@@ -57,10 +57,23 @@ export interface SocialBlock {
   align: Align;
 }
 
+export interface ColumnStyle {
+  borderTop?: boolean;
+  borderRight?: boolean;
+  borderBottom?: boolean;
+  borderLeft?: boolean;
+  borderColor?: string;
+  padding?: number;
+  backgroundColor?: string;
+}
+
 export interface ColumnsBlock {
   id: string;
   type: "columns";
   columns: Block[][];
+  // Index-aligned with `columns` — one style config per column (border sides, color, padding,
+  // background). A vertical divider between columns, e.g., is just a left border on column 2+.
+  columnStyles: ColumnStyle[];
 }
 
 /** Legacy/advanced-escape-hatch block — raw HTML passed through as-is. Every template that
@@ -94,7 +107,7 @@ export function createBlock(type: Block["type"]): Block {
     case "social":
       return { id, type, icons: [], align: "left" };
     case "columns":
-      return { id, type, columns: [[], []] };
+      return { id, type, columns: [[], []], columnStyles: [{}, {}] };
     case "html":
       return { id, type, html: "" };
   }

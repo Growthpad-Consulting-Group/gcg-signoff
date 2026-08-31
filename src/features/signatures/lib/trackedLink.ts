@@ -19,7 +19,16 @@ export function buildTrackedLinkHref(templateId: string, destination: string, la
   return `${base}/api/templates/${templateId}/click?${params}`;
 }
 
-/** Throws if `url` isn't a valid absolute URL; returns the normalized string otherwise. */
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * Throws if `url` isn't a valid absolute URL once normalized; returns the normalized string
+ * otherwise. Bare domains/paths ("growthpad.co.ke") get "https://" prepended automatically —
+ * every Link URL field in the app (image/button blocks, the RTE's tracked-link prompt) shares
+ * this, so nobody has to remember to type the scheme.
+ */
 export function normalizeUrl(url: string): string {
-  return new URL(url.trim()).toString();
+  const trimmed = url.trim();
+  const withScheme = HAS_SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return new URL(withScheme).toString();
 }

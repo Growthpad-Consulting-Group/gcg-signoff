@@ -62,7 +62,23 @@ function serializeBlock(block: Block, templateId?: string): string {
 
     case "columns": {
       const tds = block.columns
-        .map((col) => `<td style="vertical-align:top;padding:0 12px 0 0;"><table cellpadding="0" cellspacing="0" border="0" width="100%">${col.map((b) => serializeBlock(b, templateId)).join("")}</table></td>`)
+        .map((col, idx) => {
+          const cs = block.columnStyles[idx] || {};
+          const borderColor = cs.borderColor || "#e5e7eb";
+          const style = [
+            "vertical-align:top",
+            idx < block.columns.length - 1 ? "padding-right:12px" : "",
+            cs.padding ? `padding:${cs.padding}px` : "",
+            cs.backgroundColor ? `background-color:${cs.backgroundColor}` : "",
+            cs.borderTop ? `border-top:2px solid ${borderColor}` : "",
+            cs.borderRight ? `border-right:2px solid ${borderColor}` : "",
+            cs.borderBottom ? `border-bottom:2px solid ${borderColor}` : "",
+            cs.borderLeft ? `border-left:2px solid ${borderColor}` : "",
+          ]
+            .filter(Boolean)
+            .join(";");
+          return `<td style="${style};"><table cellpadding="0" cellspacing="0" border="0" width="100%">${col.map((b) => serializeBlock(b, templateId)).join("")}</table></td>`;
+        })
         .join("");
       return `<tr><td><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${tds}</tr></table></td></tr>`;
     }

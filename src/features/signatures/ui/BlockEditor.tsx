@@ -11,6 +11,7 @@ import {
   Align,
   Block,
   ColumnPath,
+  ColumnStyle,
   createBlock,
   findBlockById,
   insertAfterId,
@@ -112,13 +113,27 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
     case "columns":
       return (
         <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${block.columns.length}, 1fr)` }}>
-          {block.columns.map((col, idx) => (
-            // Stops the click from bubbling up to select this columns block itself — a click
-            // inside a column should select whichever nested block (or nothing) it landed on.
-            <div key={idx} onClick={(e) => e.stopPropagation()} className="rounded-lg border border-dashed border-app-border p-2">
-              <BlockList blocks={col} path={{ columnsId: block.id, colIndex: idx }} actions={actions} nested />
-            </div>
-          ))}
+          {block.columns.map((col, idx) => {
+            const cs = block.columnStyles[idx] || {};
+            const borderColor = cs.borderColor || "#e5e7eb";
+            const realStyle: React.CSSProperties = {
+              padding: cs.padding,
+              backgroundColor: cs.backgroundColor,
+              borderTop: cs.borderTop ? `2px solid ${borderColor}` : undefined,
+              borderRight: cs.borderRight ? `2px solid ${borderColor}` : undefined,
+              borderBottom: cs.borderBottom ? `2px solid ${borderColor}` : undefined,
+              borderLeft: cs.borderLeft ? `2px solid ${borderColor}` : undefined,
+            };
+            return (
+              // The outer dashed box is just an editing affordance; `realStyle` on the inner div
+              // is what actually ships in the exported HTML (see blockSerializer.ts).
+              <div key={idx} onClick={(e) => e.stopPropagation()} className="rounded-lg border border-dashed border-app-border/50 p-1">
+                <div style={realStyle}>
+                  <BlockList blocks={col} path={{ columnsId: block.id, colIndex: idx }} actions={actions} nested />
+                </div>
+              </div>
+            );
+          })}
         </div>
       );
     case "html":
@@ -495,20 +510,55 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
             )}
 
             {selected.type === "columns" && (
-              <Field label="Number of columns">
-                <select
-                  value={selected.columns.length}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    const columns = Array.from({ length: n }, (_, i) => selected.columns[i] || []);
-                    updateBlock(selected.id, { columns });
-                  }}
-                  className={inputClass}
-                >
-                  <option value={2}>2</option>
-                  <option value={3}>3</option>
-                </select>
-              </Field>
+              <>
+                <Field label="Number of columns">
+                  <select
+                    value={selected.columns.length}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      const columns = Array.from({ length: n }, (_, i) => selected.columns[i] || []);
+                      const columnStyles = Array.from({ length: n }, (_, i) => selected.columnStyles[i] || {});
+                      updateBlock(selected.id, { columns, columnStyles });
+                    }}
+                    className={inputClass}
+                  >
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
+                </Field>
+
+                {selected.columns.map((_, idx) => {
+                  const cs = selected.columnStyles[idx] || {};
+                  const updateColumnStyle = (patch: Partial<ColumnStyle>) => {
+                    const columnStyles = selected.columnStyles.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+                    updateBlock(selected.id, { columnStyles });
+                  };
+                  return (
+                    <div key={idx} className="space-y-2 rounded-lg border border-app-border p-2.5">
+                      <p className="text-xs font-medium text-text-hi">Column {idx + 1}</p>
+                      <div className="flex flex-wrap gap-3">
+                        {(["borderTop", "borderRight", "borderBottom", "borderLeft"] as const).map((side) => (
+                          <label key={side} className="flex items-center gap-1 text-xs text-text-lo">
+                            <input type="checkbox" checked={!!cs[side]} onChange={(e) => updateColumnStyle({ [side]: e.target.checked })} />
+                            {side.replace("border", "")}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label="Border color">
+                          <input type="color" value={cs.borderColor || "#e5e7eb"} onChange={(e) => updateColumnStyle({ borderColor: e.target.value })} className="h-8 w-full rounded-lg border border-app-border" />
+                        </Field>
+                        <Field label="Background">
+                          <input type="color" value={cs.backgroundColor || "#ffffff"} onChange={(e) => updateColumnStyle({ backgroundColor: e.target.value })} className="h-8 w-full rounded-lg border border-app-border" />
+                        </Field>
+                      </div>
+                      <Field label="Padding (px)">
+                        <input type="number" value={cs.padding || 0} onChange={(e) => updateColumnStyle({ padding: Number(e.target.value) || 0 })} className={inputClass} />
+                      </Field>
+                    </div>
+                  );
+                })}
+              </>
             )}
 
             {selected.type === "html" && (

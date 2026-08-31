@@ -6,13 +6,17 @@ interface DeployStatusChartProps {
   deployed: number;
   pending: number;
   error: number;
+  /** Overrides the "Deployed" segment's label — e.g. "Synced" for the Gmail-sync variant of
+   * this same chart. Pending/Error stay the same across both mechanisms. */
+  deployedLabel?: string;
+  centerLabel?: string;
 }
 
 // Status colors are fixed/reserved (good/warning/critical), matching the same
 // emerald/amber/rose used for deploy_status pills across Staff/Domains pages.
 // Values come from --status-* in globals.css, validated per-surface (light/dark)
 // via the dataviz skill's validate_palette.js.
-const SEGMENTS = [
+const BASE_SEGMENTS = [
   { key: "deployed", label: "Deployed", color: "var(--status-deployed)" },
   { key: "pending", label: "Pending", color: "var(--status-pending)" },
   { key: "error", label: "Error", color: "var(--status-error)" },
@@ -30,10 +34,11 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-export default function DeployStatusChart({ deployed, pending, error }: DeployStatusChartProps) {
+export default function DeployStatusChart({ deployed, pending, error, deployedLabel = "Deployed", centerLabel = "assigned" }: DeployStatusChartProps) {
   const counts = { deployed, pending, error };
   const total = deployed + pending + error;
-  const data = SEGMENTS.map((s) => ({ name: s.label, value: counts[s.key], fill: s.color }));
+  const SEGMENTS = [{ ...BASE_SEGMENTS[0], label: deployedLabel }, BASE_SEGMENTS[1], BASE_SEGMENTS[2]];
+  const data = SEGMENTS.map((s) => ({ name: s.label, value: counts[s.key as keyof typeof counts], fill: s.color }));
 
   return (
     <div className="flex items-center gap-6">
@@ -65,7 +70,7 @@ export default function DeployStatusChart({ deployed, pending, error }: DeploySt
         )}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="font-display text-2xl font-semibold text-text-hi">{total}</span>
-          <span className="text-[11px] text-text-lo">assigned</span>
+          <span className="text-[11px] text-text-lo">{centerLabel}</span>
         </div>
       </div>
 

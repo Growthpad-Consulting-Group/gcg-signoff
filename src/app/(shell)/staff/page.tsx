@@ -870,10 +870,10 @@ function StaffPageInner() {
         onClose={() => setCopyTarget(null)}
         title={`Copy signature — ${copyTarget?.full_name ?? ""}`}
         subtitle="Paste this into their mailbox's signature settings (webmail or mail client)."
-        width="max-w-lg"
+        width="max-w-3xl"
       >
         <div className="space-y-4">
-          <div className="min-h-[120px] rounded-lg border border-app-border bg-white p-4 text-black">
+          <div className="min-h-[120px] overflow-x-auto rounded-lg border border-app-border bg-white p-4 text-black">
             {loadingCopyPreview ? (
               <p className="text-sm text-gray-400">Loading preview…</p>
             ) : copyPreviewHtml ? (

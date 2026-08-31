@@ -236,7 +236,7 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         title="Drag to move"
-        className="mt-1 shrink-0 cursor-grab text-text-lo opacity-0 transition-opacity hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
+        className="mt-1 shrink-0 cursor-grab rounded p-1 text-text-lo opacity-0 transition hover:bg-surface-2 hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
       >
         <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
       </button>
@@ -250,7 +250,7 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
             actions.onDuplicate(block.id);
           }}
           title="Duplicate"
-          className="text-text-lo hover:text-text-hi"
+          className="rounded p-1 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
         >
           <Icon icon="solar:copy-broken" className="h-3.5 w-3.5" />
         </button>
@@ -260,7 +260,7 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
             actions.onRemove(block.id);
           }}
           title="Delete"
-          className="text-text-lo hover:text-status-danger"
+          className="rounded p-1 text-text-lo transition-colors hover:bg-status-danger/10 hover:text-status-danger"
         >
           <Icon icon="solar:trash-bin-trash-broken" className="h-3.5 w-3.5" />
         </button>

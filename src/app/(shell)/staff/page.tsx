@@ -875,23 +875,38 @@ function StaffPageInner() {
         width="max-w-3xl"
       >
         <div className="space-y-4">
-          <div className="inline-flex rounded-lg border border-app-border p-0.5">
-            <button
-              onClick={() => setCopyView("preview")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                copyView === "preview" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
-              }`}
-            >
-              Preview
-            </button>
-            <button
-              onClick={() => setCopyView("html")}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                copyView === "html" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
-              }`}
-            >
-              HTML source
-            </button>
+          {copyTarget && (
+            <div className="flex items-center gap-2.5 rounded-lg bg-surface-2 px-3 py-2">
+              <Avatar name={copyTarget.full_name} photoUrl={copyTarget.photo_url} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-text-hi">{copyTarget.full_name}</p>
+                <p className="truncate text-xs text-text-lo">{copyTarget.email}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="inline-flex rounded-lg border border-app-border p-0.5">
+              <button
+                onClick={() => setCopyView("preview")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  copyView === "preview" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+                }`}
+              >
+                <Icon icon="solar:eye-broken" className="h-3.5 w-3.5" />
+                Preview
+              </button>
+              <button
+                onClick={() => setCopyView("html")}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                  copyView === "html" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+                }`}
+              >
+                <Icon icon="solar:code-square-broken" className="h-3.5 w-3.5" />
+                HTML source
+              </button>
+            </div>
+            {copyView === "preview" && <span className="text-[11px] text-text-lo">Rendered as it&apos;ll actually look</span>}
           </div>
 
           {copyView === "preview" ? (
@@ -910,10 +925,23 @@ function StaffPageInner() {
             </pre>
           )}
 
-          <Button className="w-full" onClick={copySignature} disabled={!copyPreviewHtml || loadingCopyPreview}>
-            <Icon icon="solar:copy-broken" className="h-4 w-4" />
-            Copy signature
-          </Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={copySignature} disabled={!copyPreviewHtml || loadingCopyPreview}>
+              <Icon icon="solar:copy-broken" className="h-4 w-4" />
+              Copy signature
+            </Button>
+            {copyTarget && assignmentOf(copyTarget) && (
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => router.push(`/templates/${assignmentOf(copyTarget)!.template_id}`)}
+                title="Edit the template this signature comes from"
+              >
+                <Icon icon="solar:pen-new-square-broken" className="h-4 w-4" />
+                Edit template
+              </Button>
+            )}
+          </div>
         </div>
       </SimpleModal>
 

@@ -19,6 +19,7 @@ import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
 import { buildTrackedLinkHref, normalizeUrl } from "@/features/signatures/lib/trackedLink";
 import { Block } from "@/features/signatures/lib/blocks";
 import SlashCommandMenu, { SlashCommandMenuHandle, SlashItem } from "@/features/signatures/ui/SlashCommandMenu";
+import SimpleModal from "@/shared/ui/SimpleModal";
 
 const BLOCK_ICONS: Record<string, string> = {
   image: "solar:gallery-broken",
@@ -122,23 +123,42 @@ export default function RichTextEditor({
   templateId: string;
   onInsertBlockAfter?: (type: Block["type"]) => void;
 }) {
-  const insertTrackedLinkAt = (editor: ReturnType<typeof useEditor>, range?: { from: number; to: number }) => {
+  // Replaces the old window.prompt()-based flow with a real modal — "linkRange" doubles as both
+  // the open/closed flag and the pending insertion point: "none" for the toolbar/bubble-menu case
+  // (insert at the current selection), a {from,to} range for the slash-command case (replace the
+  // "/link" text itself), null when the modal is closed.
+  const [linkRange, setLinkRange] = useState<{ from: number; to: number } | "none" | null>(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkError, setLinkError] = useState("");
+
+  const openLinkModal = (range?: { from: number; to: number }) => {
+    setLinkRange(range ?? "none");
+    setLinkUrl("");
+    setLinkLabel("");
+    setLinkError("");
+  };
+
+  const confirmLinkModal = (editor: ReturnType<typeof useEditor>) => {
     if (!editor) return;
-    const url = window.prompt("Destination URL (where the click should land):");
-    if (!url?.trim()) return;
-    let normalized: string;
-    try {
-      normalized = normalizeUrl(url);
-    } catch {
-      window.alert("That doesn't look like a valid URL — include https://");
+    const trimmed = linkUrl.trim();
+    if (!trimmed) {
+      setLinkError("Enter a destination URL.");
       return;
     }
-    const label = window.prompt("Label for this link (optional, shown in click stats):") || "";
-    const trackedHref = buildTrackedLinkHref(templateId, normalized, label);
-    const text = label.trim() || normalized;
+    let normalized: string;
+    try {
+      normalized = normalizeUrl(trimmed);
+    } catch {
+      setLinkError("That doesn't look like a valid URL — include https://");
+      return;
+    }
+    const trackedHref = buildTrackedLinkHref(templateId, normalized, linkLabel);
+    const text = linkLabel.trim() || normalized;
     const chain = editor.chain().focus();
-    if (range) chain.deleteRange(range);
+    if (linkRange && linkRange !== "none") chain.deleteRange(linkRange);
     chain.insertContent(`<a href="${trackedHref}">${text}</a>`).run();
+    setLinkRange(null);
   };
 
   // "/" opens a filterable menu — insert a new block (image/button/divider/…), a merge tag, or
@@ -179,8 +199,8 @@ export default function RichTextEditor({
               id: "tracked-link",
               label: "Tracked link",
               icon: "solar:link-broken",
-              action: (editor: Editor, range: Range) => {
-                insertTrackedLinkAt(editor, range);
+              action: (_editor: Editor, range: Range) => {
+                openLinkModal(range);
               },
             },
           ];
@@ -258,7 +278,7 @@ export default function RichTextEditor({
       {/* Persistent toolbar — always visible so merge tags and links are reachable on empty blocks */}
       <div className="mb-1 flex items-center gap-0.5 rounded-lg border border-app-border bg-surface p-1">
         <MergeTagButton onInsert={(tag) => editor.chain().focus().insertContent(`{{${tag}}}`).run()} />
-        <ToolbarButton title="Tracked link" icon="solar:link-broken" onClick={() => insertTrackedLinkAt(editor)} />
+        <ToolbarButton title="Tracked link" icon="solar:link-broken" onClick={() => openLinkModal()} />
       </div>
       <BubbleMenu editor={editor} className="flex items-center gap-0.5 rounded-lg border border-app-border bg-surface p-1 shadow-lg">
         <ToolbarButton title="Bold" icon="solar:text-bold-broken" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} />
@@ -271,11 +291,52 @@ export default function RichTextEditor({
         <div className="mx-0.5 h-4 w-px bg-app-border" />
         <ToolbarButton title="Highlight" icon="solar:pen-broken" active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff1c2" }).run()} />
         <ToolbarButton title="Brand color text" icon="solar:palette-broken" active={editor.isActive("textStyle", { color: "#f05d23" })} onClick={() => editor.chain().focus().setColor("#f05d23").run()} />
-        <ToolbarButton title="Link" icon="solar:link-broken" onClick={() => insertTrackedLinkAt(editor)} />
+        <ToolbarButton title="Link" icon="solar:link-broken" onClick={() => openLinkModal()} />
         <div className="mx-0.5 h-4 w-px bg-app-border" />
         <MergeTagButton onInsert={(tag) => editor.chain().focus().insertContent(`{{${tag}}}`).run()} />
       </BubbleMenu>
       <EditorContent editor={editor} />
+
+      <SimpleModal isOpen={linkRange !== null} onClose={() => setLinkRange(null)} title="Insert tracked link" width="max-w-md">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-hi">Destination URL</label>
+            <input
+              autoFocus
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmLinkModal(editor)}
+              placeholder="https://example.com"
+              className="w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-hi">Label (optional)</label>
+            <input
+              value={linkLabel}
+              onChange={(e) => setLinkLabel(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmLinkModal(editor)}
+              placeholder="Shown as the link text, and in click stats"
+              className="w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          {linkError && <p className="text-xs text-status-danger">{linkError}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={() => setLinkRange(null)}
+              className="rounded-lg border border-app-border bg-surface px-3 py-1.5 text-sm font-medium text-text-hi hover:bg-surface-2"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => confirmLinkModal(editor)}
+              className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              Insert link
+            </button>
+          </div>
+        </div>
+      </SimpleModal>
     </div>
   );
 }

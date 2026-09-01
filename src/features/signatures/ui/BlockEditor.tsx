@@ -138,7 +138,9 @@ function createStaffCardBlock(): Block {
 // the moment this preset is added, from whichever environment happened to be editing (local dev
 // bakes a dead localhost URL nobody but that machine can resolve). Same gotcha as
 // blockSerializer.ts's SOCIAL_ICON and trackedLink.ts's tracked-link URLs.
-const CONTACT_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/contact/${icon}.svg`;
+// .png, not .svg — Gmail doesn't render SVG images in signatures at all (shows as a broken
+// image), the same reason the pre-existing social icons are PNG too.
+const CONTACT_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/contact/${icon}.png`;
 
 /** One icon-in-a-circle + text row (phone/mobile/address/website) — a `columns` block just like
  * the staff card, so it stays fully editable (swap the icon, edit the text, resize the columns)
@@ -768,11 +770,22 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         </div>
       </div>
 
-      {/* Canvas — capped at canvasWidth, the "master" width nothing added is meant to exceed
-          (matches the real px width the exported HTML's outer table is given). */}
+      {/* Canvas. Editing width stays comfortable to work in regardless of canvasWidth — cramping
+          the whole workspace down to a 600px signature width made dragging/clicking blocks
+          harder for no real benefit, since canvasWidth is what the *exported* HTML actually gets
+          capped to (blockSerializer.ts), not something the editing surface needs to enforce
+          visually too. A dashed guide marks where the real signature width ends instead, so it's
+          still visible without constraining the work area. */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
-        <div className="mx-auto w-full" style={{ maxWidth: canvasWidth }}>
-          <div className="overflow-hidden rounded-lg bg-surface p-6 shadow-sm">
+        <div className="mx-auto w-full" style={{ maxWidth: Math.max(canvasWidth, 700) }}>
+          <div className="relative rounded-lg bg-surface p-6 shadow-sm">
+            {canvasWidth < 700 && (
+              <div
+                className="pointer-events-none absolute inset-y-0 border-r border-dashed border-brand-500/40"
+                style={{ left: canvasWidth + 24 /* + the card's own left padding */ }}
+                title={`Signature width: ${canvasWidth}px`}
+              />
+            )}
             <BlockList blocks={blocks} path={null} actions={actions} />
           </div>
         </div>
@@ -788,8 +801,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
               <Field label="Content width (px)">
                 <input
                   type="number"
+                  // Clamping on every keystroke (rather than on blur) fought typing itself — e.g.
+                  // the first digit of "650" is briefly "6", which used to get force-clamped to
+                  // 200 immediately, so the field could never settle on anything but its own
+                  // min/max/default. Let it hold whatever's being typed and only clamp once
+                  // typing is done, same as every other numeric field in this panel.
                   value={canvasWidth}
-                  onChange={(e) => setCanvasWidth(Math.max(200, Math.min(1000, Number(e.target.value) || DEFAULT_CANVAS_WIDTH)))}
+                  onChange={(e) => setCanvasWidth(Number(e.target.value) || 0)}
+                  onBlur={() => setCanvasWidth((w) => Math.max(200, Math.min(1000, w || DEFAULT_CANVAS_WIDTH)))}
                   min={200}
                   max={1000}
                   className={inputClass}

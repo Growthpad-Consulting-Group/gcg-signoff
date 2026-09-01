@@ -16,7 +16,7 @@ import { Editor, Extension, Range } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import { Icon } from "@iconify/react";
 import { MERGE_TAGS } from "@/features/signatures/lib/mergeTags";
-import { buildTrackedLinkHref, normalizeUrl } from "@/features/signatures/lib/trackedLink";
+import { buildTrackedLinkHref, normalizeUrl, PRODUCTION_APP_URL } from "@/features/signatures/lib/trackedLink";
 import { Block } from "@/features/signatures/lib/blocks";
 import SlashCommandMenu, { SlashCommandMenuHandle, SlashItem } from "@/features/signatures/ui/SlashCommandMenu";
 import SimpleModal from "@/shared/ui/SimpleModal";
@@ -131,21 +131,48 @@ export default function RichTextEditor({
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [linkEditing, setLinkEditing] = useState(false); // opened on an existing link vs. inserting a new one — just for the modal's copy
 
   const openLinkModal = (range?: { from: number; to: number }) => {
     setLinkRange(range ?? "none");
+    setLinkError("");
+
+    // Cursor/selection sitting inside an existing link (toolbar/bubble-menu case only — a
+    // slash-command range is fresh "/link" trigger text, never an existing one) — expand to the
+    // whole link and pre-fill from what's already there, so this edits it in place instead of
+    // inserting a second link stacked on top of the first.
+    if (!range && editor?.isActive("link")) {
+      setLinkEditing(true);
+      editor.chain().extendMarkRange("link").run();
+      const { href } = editor.getAttributes("link") as { href?: string };
+      const sel = editor.state.selection;
+      const text = editor.state.doc.textBetween(sel.from, sel.to, " ");
+      // The stored href is our own tracked-click wrapper URL, not the real destination — pull
+      // the actual destination back out of its `to` param so editing shows the real URL, not
+      // .../api/templates/.../click?to=....
+      let destination = href || "";
+      try {
+        const wrapped = new URL(href || "", PRODUCTION_APP_URL);
+        if (wrapped.searchParams.has("to")) destination = wrapped.searchParams.get("to") || destination;
+      } catch {
+        // Not a URL we recognize (or not our wrapper) — fall back to the raw href as-is.
+      }
+      setLinkUrl(destination);
+      setLinkLabel(text);
+      return;
+    }
+
+    setLinkEditing(false);
     setLinkUrl("");
-    // Default the Label field to whatever text is currently selected (the toolbar/bubble-menu
-    // case only — a slash-command `range` is the "/link" trigger text itself, not real content).
-    // Leaving Label blank used to silently replace the selection with the raw URL instead of
-    // keeping what was selected, which isn't how "add a link" behaves anywhere else — selecting
-    // "+254 701 850 850" and linking it should keep showing "+254 701 850 850", not the URL.
+    // Default the Label field to whatever text is currently selected. Leaving Label blank used to
+    // silently replace the selection with the raw URL instead of keeping what was selected, which
+    // isn't how "add a link" behaves anywhere else — selecting "+254 701 850 850" and linking it
+    // should keep showing "+254 701 850 850", not the URL.
     const selectedText =
       !range && editor && !editor.state.selection.empty
         ? editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, " ")
         : "";
     setLinkLabel(selectedText);
-    setLinkError("");
   };
 
   const confirmLinkModal = (editor: ReturnType<typeof useEditor>) => {
@@ -271,6 +298,17 @@ export default function RichTextEditor({
       attributes: {
         class: "prose prose-sm max-w-none text-text-hi focus:outline-none min-h-[1.5em]",
       },
+      // Link's own openOnClick:false stops IT from calling window.open, but a real <a> inside a
+      // contenteditable region can still follow its href as the browser's own default action in
+      // some browsers regardless — this catches any click landing on (or inside) a link and
+      // explicitly cancels that, full stop, rather than relying on the extension's option alone.
+      handleClick: (_view, _pos, event) => {
+        if ((event.target as HTMLElement).closest("a")) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
     },
   });
 
@@ -306,7 +344,7 @@ export default function RichTextEditor({
       </BubbleMenu>
       <EditorContent editor={editor} />
 
-      <SimpleModal isOpen={linkRange !== null} onClose={() => setLinkRange(null)} title="Insert tracked link" width="max-w-md">
+      <SimpleModal isOpen={linkRange !== null} onClose={() => setLinkRange(null)} title={linkEditing ? "Edit link" : "Insert tracked link"} width="max-w-md">
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-text-hi">Destination URL</label>
@@ -341,7 +379,7 @@ export default function RichTextEditor({
               onClick={() => confirmLinkModal(editor)}
               className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Insert link
+              {linkEditing ? "Save link" : "Insert link"}
             </button>
           </div>
         </div>

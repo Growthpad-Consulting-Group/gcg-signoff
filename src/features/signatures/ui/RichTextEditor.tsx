@@ -135,7 +135,16 @@ export default function RichTextEditor({
   const openLinkModal = (range?: { from: number; to: number }) => {
     setLinkRange(range ?? "none");
     setLinkUrl("");
-    setLinkLabel("");
+    // Default the Label field to whatever text is currently selected (the toolbar/bubble-menu
+    // case only — a slash-command `range` is the "/link" trigger text itself, not real content).
+    // Leaving Label blank used to silently replace the selection with the raw URL instead of
+    // keeping what was selected, which isn't how "add a link" behaves anywhere else — selecting
+    // "+254 701 850 850" and linking it should keep showing "+254 701 850 850", not the URL.
+    const selectedText =
+      !range && editor && !editor.state.selection.empty
+        ? editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, " ")
+        : "";
+    setLinkLabel(selectedText);
     setLinkError("");
   };
 
@@ -316,7 +325,7 @@ export default function RichTextEditor({
               value={linkLabel}
               onChange={(e) => setLinkLabel(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && confirmLinkModal(editor)}
-              placeholder="Shown as the link text, and in click stats"
+              placeholder="Link text, and how it's named in click stats — defaults to your selection"
               className="w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>

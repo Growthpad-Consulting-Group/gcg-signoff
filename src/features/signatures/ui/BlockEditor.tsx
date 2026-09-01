@@ -128,6 +128,18 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
         <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />
       );
     case "image":
+      // The merge tag isn't a real URL, so the canvas can't actually load it — show a clear
+      // placeholder instead of what would otherwise just look like a broken image.
+      if (block.src === "{{photo_url}}") {
+        return (
+          <div
+            className={`flex items-center justify-center border border-dashed border-app-border bg-surface-2/60 text-text-lo ${block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}`}
+            style={{ width: block.width, height: block.height || block.width, borderRadius: imageBorderRadius(block.shape) }}
+          >
+            <Icon icon="solar:user-circle-broken" className="h-1/2 w-1/2" />
+          </div>
+        );
+      }
       return block.src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -628,14 +640,29 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
               <>
                 <Field label="Image">
                   <div className="flex items-center gap-2">
-                    {selected.src && (
+                    {selected.src && selected.src !== "{{photo_url}}" && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={selected.src} alt="" className="h-10 w-10 rounded border border-app-border object-cover" />
                     )}
-                    <button onClick={() => setPickerOpenFor(selected.id)} className="rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi hover:bg-surface-2">
-                      {selected.src ? "Change image" : "Choose image"}
-                    </button>
+                    {selected.src === "{{photo_url}}" && (
+                      <span className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-app-border text-text-lo">
+                        <Icon icon="solar:user-circle-broken" className="h-5 w-5" />
+                      </span>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <button onClick={() => setPickerOpenFor(selected.id)} className="rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi hover:bg-surface-2">
+                        {selected.src && selected.src !== "{{photo_url}}" ? "Change image" : "Choose image"}
+                      </button>
+                      <button
+                        onClick={() => updateBlock(selected.id, { src: "{{photo_url}}" })}
+                        disabled={selected.src === "{{photo_url}}"}
+                        className="rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {selected.src === "{{photo_url}}" ? "Using each staff member's photo ✓" : "Use each staff member's photo"}
+                      </button>
+                    </div>
                   </div>
+                  <p className="mt-1.5 text-xs text-text-lo">A static image is the same for everyone; each staff member's photo shows their own picture once the signature is sent.</p>
                 </Field>
                 <Field label="Alt text">
                   <input value={selected.alt} onChange={(e) => updateBlock(selected.id, { alt: e.target.value })} className={inputClass} />

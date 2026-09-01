@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!silent) {
     const { data: previous } = await supabase
       .from("signature_templates")
-      .select("name, html, blocks, builder_data")
+      .select("name, html, blocks, builder_data, canvas_width")
       .eq("id", id)
       .single();
     if (previous) {

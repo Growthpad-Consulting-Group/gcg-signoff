@@ -7,7 +7,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: version, error: versionError } = await supabase
     .from("signature_template_versions")
-    .select("name, html, blocks, builder_data")
+    .select("name, html, blocks, builder_data, canvas_width")
     .eq("id", versionId)
     .eq("template_id", id)
     .single();
@@ -16,7 +16,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // Snapshot the current state before overwriting it, so restoring is itself undoable.
   const { data: current } = await supabase
     .from("signature_templates")
-    .select("name, html, blocks, builder_data")
+    .select("name, html, blocks, builder_data, canvas_width")
     .eq("id", id)
     .single();
   if (current) {
@@ -25,7 +25,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: template, error } = await supabase
     .from("signature_templates")
-    .update({ html: version.html, blocks: version.blocks, builder_data: version.builder_data, updated_at: new Date().toISOString() })
+    .update({
+      html: version.html,
+      blocks: version.blocks,
+      builder_data: version.builder_data,
+      canvas_width: version.canvas_width,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .select("*")
     .single();

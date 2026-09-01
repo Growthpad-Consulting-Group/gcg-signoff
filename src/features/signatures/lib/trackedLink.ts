@@ -10,8 +10,10 @@
 // is *correctly* localhost during local dev for other purposes (redirects, etc.), but using it
 // here means editing locally silently bakes a dead localhost link into content real recipients
 // will click. This one link always needs the real deployed URL, never "wherever this happens
-// to be running right now".
-const PRODUCTION_APP_URL = "https://signoff.growthpad.co.ke";
+// to be running right now". Exported so any other baked-in-at-save-time asset URL (self-hosted
+// icon images, etc.) uses the same one instead of reinventing this with process.env — see
+// blockSerializer.ts's SOCIAL_ICON/CONTACT_ICON, which used to get this wrong.
+export const PRODUCTION_APP_URL = "https://signoff.growthpad.co.ke";
 
 export function buildTrackedLinkHref(templateId: string, destination: string, label: string): string {
   const base = PRODUCTION_APP_URL;

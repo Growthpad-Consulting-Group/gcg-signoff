@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, ReactRenderer } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
+import { Paragraph } from "@tiptap/extension-paragraph";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
@@ -35,6 +36,24 @@ const BLOCK_LABELS: Record<string, string> = {
   social: "Social row",
   columns: "Columns",
 };
+
+// Tiptap's stock Paragraph node has no `style` attribute in its schema, so parsing a paragraph
+// that came with one (e.g. a preset block's `<p style="margin:0;...">`) silently drops it — the
+// moment a text block is selected and its Tiptap instance mounts, any custom paragraph styling
+// vanishes, and the next real edit saves that stripped version permanently. This extension round-
+// trips `style` like any other attribute so a preset's inline styling survives being edited.
+const StyledParagraph = Paragraph.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("style"),
+        renderHTML: (attributes) => (attributes.style ? { style: attributes.style } : {}),
+      },
+    };
+  },
+});
 
 function ToolbarButton({ active, onClick, icon, title }: { active?: boolean; onClick: () => void; icon: string; title: string }) {
   return (
@@ -206,7 +225,8 @@ export default function RichTextEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit.configure({ heading: false }), // email signatures have no use for h1-h6 sizing
+      StarterKit.configure({ heading: false, paragraph: false }), // email signatures have no use for h1-h6 sizing; StyledParagraph below replaces the default
+      StyledParagraph,
       Underline,
       Link.configure({ openOnClick: false, autolink: false }),
       TextAlign.configure({ types: ["paragraph"] }),

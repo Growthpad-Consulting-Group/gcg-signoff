@@ -1,9 +1,11 @@
 import type { Block } from "./blocks";
 import { computeColumnWidths, imageBorderRadius } from "./blocks";
-import { buildTrackedLinkHref, normalizeUrl } from "./trackedLink";
+import { buildTrackedLinkHref, normalizeUrl, PRODUCTION_APP_URL } from "./trackedLink";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
-const SOCIAL_ICON = (icon: string) => `${APP_URL}/assets/icons/social/${icon}.png`;
+// PRODUCTION_APP_URL, not NEXT_PUBLIC_APP_URL — this gets baked into stored template html the
+// moment a social row is added, from whichever environment happened to be editing (see
+// trackedLink.ts's comment on the same gotcha for tracked links).
+const SOCIAL_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/social/${icon}.png`;
 
 const ALIGN_TD = (align: "left" | "center" | "right") => (align === "left" ? "" : `text-align:${align};`);
 
@@ -32,16 +34,24 @@ function serializeBlock(block: Block, templateId?: string): string {
       const heightStyle = block.height ? `height:${block.height}px;object-fit:cover;` : "";
       // Outlook desktop's Word-based renderer ignores border-radius on <img> same as it ignores
       // object-fit above — Gmail/Apple Mail/mobile clients render it fine. Same accepted gap.
-      const radiusStyle = `border-radius:${imageBorderRadius(block.shape)};`;
-      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}${radiusStyle}border:0;" />`;
+      const radius = imageBorderRadius(block.shape);
+      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border-radius:${radius};border:0;" />`;
+      // Gmail's own signature-settings sanitizer (a different code path than how it renders a
+      // *received* message body) is known to strip border-radius off a raw <img> — it survives
+      // more reliably on a wrapping element, so a rounded/circle image also gets clipped via an
+      // overflow:hidden span with the same radius, not just the <img>'s own style.
+      const wrappedImg =
+        radius === "0"
+          ? img
+          : `<span style="display:inline-block;overflow:hidden;border-radius:${radius};width:${block.width}px;${block.height ? `height:${block.height}px;` : ""}line-height:0;">${img}</span>`;
       const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
       // The anchor needs its own explicit size matching the image — without one, wrapping a
       // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it
       // then stretches to fill the <td> (which itself expands to the table's width:100%), so the
       // clickable area extends well past the visible image into any empty space beside it.
       const content = href
-        ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${img}</a>`
-        : img;
+        ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${wrappedImg}</a>`
+        : wrappedImg;
       return `<tr><td style="${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 

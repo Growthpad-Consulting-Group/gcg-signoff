@@ -31,6 +31,7 @@ import {
   wrapLegacyHtml,
 } from "@/features/signatures/lib/blocks";
 import { DEFAULT_CANVAS_WIDTH, serializeBlocks } from "@/features/signatures/lib/blockSerializer";
+import { PRODUCTION_APP_URL } from "@/features/signatures/lib/trackedLink";
 
 // dnd-kit droppable ids for each list's *container* (distinct from any block's own id) — needed
 // so an empty column, which otherwise has nothing to be "over", is still a valid drop target,
@@ -133,8 +134,11 @@ function createStaffCardBlock(): Block {
   };
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
-const CONTACT_ICON = (icon: string) => `${APP_URL}/assets/icons/contact/${icon}.svg`;
+// PRODUCTION_APP_URL, not NEXT_PUBLIC_APP_URL — this gets baked into the stored block's `src`
+// the moment this preset is added, from whichever environment happened to be editing (local dev
+// bakes a dead localhost URL nobody but that machine can resolve). Same gotcha as
+// blockSerializer.ts's SOCIAL_ICON and trackedLink.ts's tracked-link URLs.
+const CONTACT_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/contact/${icon}.svg`;
 
 /** One icon-in-a-circle + text row (phone/mobile/address/website) — a `columns` block just like
  * the staff card, so it stays fully editable (swap the icon, edit the text, resize the columns)

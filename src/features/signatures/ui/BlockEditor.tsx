@@ -68,6 +68,13 @@ const PALETTE_DRAG_PREFIX = "palette:";
 const paletteDragId = (type: Block["type"]) => `${PALETTE_DRAG_PREFIX}${type}`;
 const paletteTypeFromDragId = (id: string): Block["type"] | null => (id.startsWith(PALETTE_DRAG_PREFIX) ? (id.slice(PALETTE_DRAG_PREFIX.length) as Block["type"]) : null);
 
+// Same idea as the palette prefix above, but for a preset (which builds one or more ready-made
+// blocks rather than a single blank one of a given type) — a separate prefix so onDragEnd can
+// tell the two apart.
+const PRESET_DRAG_PREFIX = "preset:";
+const presetDragId = (id: string) => `${PRESET_DRAG_PREFIX}${id}`;
+const presetIdFromDragId = (id: string): string | null => (id.startsWith(PRESET_DRAG_PREFIX) ? id.slice(PRESET_DRAG_PREFIX.length) : null);
+
 export interface BlockEditorHandle {
   getExport: () => { blocks: Block[]; html: string };
   undo: () => void;
@@ -155,6 +162,14 @@ function createContactDetailsBlocks(): Block[] {
     createContactRow("website", "www.example.com"),
   ];
 }
+
+// The Presets section in the sidebar — each builds one or more ready-made blocks. Shared between
+// the click-to-append buttons and the drag-into-canvas handling in onDragEnd, same relationship
+// PALETTE has to the plain block types.
+const PRESETS: { id: string; label: string; icon: string; build: () => Block[] }[] = [
+  { id: "staffCard", label: "Staff card (photo + name/role)", icon: "solar:user-id-broken", build: () => [createStaffCardBlock()] },
+  { id: "contactDetails", label: "Contact details (icons)", icon: "solar:phone-broken", build: createContactDetailsBlocks },
+];
 
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 
@@ -405,6 +420,27 @@ function PaletteButton({ type, label, icon, onClick }: { type: Block["type"]; la
   );
 }
 
+/** Same drag-or-click behavior as PaletteButton, but for a Preset entry (the `preset:` id prefix
+ * instead of `palette:`) — dragging one onto the canvas or into a column inserts every block the
+ * preset builds, right at the drop point. */
+function PresetButton({ id, label, icon, onClick }: { id: string; label: string; icon: string; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: presetDragId(id) });
+  return (
+    <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2 ${
+        isDragging ? "cursor-grabbing opacity-50" : "cursor-grab"
+      }`}
+    >
+      <Icon icon={icon} className="h-4 w-4 text-brand-600" />
+      {label}
+    </button>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -541,11 +577,6 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     setSelectedId(block.id);
   };
 
-  const addPresetBlock = (block: Block) => {
-    setBlocks((prev) => [...prev, block]);
-    setSelectedId(block.id);
-  };
-
   const addPresetBlocks = (newBlocks: Block[]) => {
     if (newBlocks.length === 0) return;
     setBlocks((prev) => [...prev, ...newBlocks]);
@@ -610,8 +641,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const paletteType = paletteTypeFromDragId(String(event.active.id));
-    setActiveDragLabel(paletteType ? PALETTE.find((p) => p.type === paletteType)?.label ?? null : null);
+    const activeId = String(event.active.id);
+    const paletteType = paletteTypeFromDragId(activeId);
+    if (paletteType) {
+      setActiveDragLabel(PALETTE.find((p) => p.type === paletteType)?.label ?? null);
+      return;
+    }
+    const presetId = presetIdFromDragId(activeId);
+    setActiveDragLabel(presetId ? PRESETS.find((p) => p.id === presetId)?.label ?? null : null);
   };
 
   // Single DndContext for the whole tree (top-level canvas + every column) — dnd-kit's standard
@@ -638,6 +675,28 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         return insertIntoList(prev, toPath, newBlock, targetIndex === -1 ? targetList.length : targetIndex);
       });
       setSelectedId(newBlock.id);
+      return;
+    }
+
+    // Dragging a preset in — same idea, but it builds one or more ready-made blocks, inserted
+    // together at the drop point in order.
+    const presetId = presetIdFromDragId(activeId);
+    if (presetId) {
+      const preset = PRESETS.find((p) => p.id === presetId);
+      if (!preset) return;
+      const newBlocks = preset.build();
+      if (newBlocks.length === 0) return;
+      const parsedContainer = parseContainerId(overId);
+      const overIsContainer = parsedContainer !== undefined;
+      const toPath = overIsContainer ? parsedContainer : findContainerPath(blocks, overId);
+      if (toPath === undefined) return;
+      setBlocks((prev) => {
+        const targetList = getListAt(prev, toPath);
+        const startIndex = overIsContainer ? targetList.length : targetList.findIndex((b) => b.id === overId);
+        const baseIndex = startIndex === -1 ? targetList.length : startIndex;
+        return newBlocks.reduce((acc, block, i) => insertIntoList(acc, toPath, block, baseIndex + i), prev);
+      });
+      setSelectedId(newBlocks[0].id);
       return;
     }
 
@@ -686,20 +745,9 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
 
         <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-text-lo">Presets</p>
         <div className="space-y-2">
-          <button
-            onClick={() => addPresetBlock(createStaffCardBlock())}
-            className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
-          >
-            <Icon icon="solar:user-id-broken" className="h-4 w-4 text-brand-600" />
-            Staff card (photo + name/role)
-          </button>
-          <button
-            onClick={() => addPresetBlocks(createContactDetailsBlocks())}
-            className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
-          >
-            <Icon icon="solar:phone-broken" className="h-4 w-4 text-brand-600" />
-            Contact details (icons)
-          </button>
+          {PRESETS.map((p) => (
+            <PresetButton key={p.id} id={p.id} label={p.label} icon={p.icon} onClick={() => addPresetBlocks(p.build())} />
+          ))}
         </div>
       </div>
 

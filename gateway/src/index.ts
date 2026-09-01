@@ -1,3 +1,4 @@
+import { readFileSync } from "fs";
 import { SMTPServer } from "smtp-server";
 import { simpleParser } from "mailparser";
 import { config } from "./config.js";
@@ -16,10 +17,22 @@ function isAllowed(remoteAddress: string): boolean {
   return isIpAllowed(remoteAddress, config.allowedClientIps);
 }
 
+// Real cert for STARTTLS if configured (see config.ts) — otherwise smtp-server falls back to
+// its own built-in default cert, whose private key is publicly known (fine for local dev only).
+function loadTls(): { key: Buffer; cert: Buffer } | Record<string, never> {
+  if (!config.tlsCertPath || !config.tlsKeyPath) {
+    console.warn("[gateway] GATEWAY_TLS_CERT_PATH/GATEWAY_TLS_KEY_PATH not set — using smtp-server's default TLS cert, which is NOT secure for a publicly reachable gateway.");
+    return {};
+  }
+  return { key: readFileSync(config.tlsKeyPath), cert: readFileSync(config.tlsCertPath) };
+}
+const tls = loadTls();
+
 const server = new SMTPServer({
   banner: "Signoff outbound signature gateway",
   authOptional: true,
   disabledCommands: ["AUTH"], // Google's Outbound Gateway connects unauthenticated over the IP allowlist below.
+  ...tls,
 
   onConnect(session, callback) {
     if (!isAllowed(session.remoteAddress)) {

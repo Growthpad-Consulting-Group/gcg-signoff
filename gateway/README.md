@@ -44,8 +44,38 @@ the message passes through unmodified and the gateway logs "no signature — sen
 This handles every piece of outgoing company mail. Don't skip straight to step 4.
 
 1. **Deploy the gateway somewhere with a static outbound IP** (a small VM works — this is a
-   long-running TCP listener, not a serverless function). Run it behind TLS if possible; Google
-   supports STARTTLS to the gateway.
+   long-running TCP listener, not a serverless function). Give it a real TLS cert for STARTTLS
+   rather than smtp-server's built-in default (whose private key is publicly known):
+   ```bash
+   sudo dnf install -y epel-release && sudo dnf config-manager --set-enabled ol9_developer_EPEL
+   sudo dnf install -y certbot
+   # Needs an A record for this hostname pointing at the box, and port 80 briefly reachable
+   # (open it in both the OS firewall and the cloud provider's security list/rules) —
+   # certbot's standalone mode binds it just for the HTTP-01 challenge, nothing stays open after.
+   sudo systemctl stop signoff-gateway
+   sudo certbot certonly --standalone --non-interactive --agree-tos -m you@yourdomain.com -d gateway.yourdomain.com
+   ```
+   Then set up a deploy hook so renewals (auto-scheduled by certbot, ~every 60 days) copy the
+   renewed cert somewhere the gateway's non-root user can actually read — Let's Encrypt's own
+   `/etc/letsencrypt/live/.../privkey.pem` is root-only:
+   ```bash
+   sudo mkdir -p /opt/signoff-gateway/tls
+   sudo tee /etc/letsencrypt/renewal-hooks/deploy/signoff-gateway.sh > /dev/null << 'EOF'
+   #!/bin/bash
+   set -e
+   cp /etc/letsencrypt/live/gateway.yourdomain.com/fullchain.pem /opt/signoff-gateway/tls/fullchain.pem
+   cp /etc/letsencrypt/live/gateway.yourdomain.com/privkey.pem /opt/signoff-gateway/tls/privkey.pem
+   chown opc:opc /opt/signoff-gateway/tls/fullchain.pem /opt/signoff-gateway/tls/privkey.pem
+   chmod 600 /opt/signoff-gateway/tls/privkey.pem
+   chmod 644 /opt/signoff-gateway/tls/fullchain.pem
+   systemctl restart signoff-gateway
+   EOF
+   sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/signoff-gateway.sh
+   sudo /etc/letsencrypt/renewal-hooks/deploy/signoff-gateway.sh  # run once now to populate it
+   ```
+   Then set `GATEWAY_TLS_CERT_PATH=/opt/signoff-gateway/tls/fullchain.pem` and
+   `GATEWAY_TLS_KEY_PATH=/opt/signoff-gateway/tls/privkey.pem` in `.env`. Omitting both falls
+   back to the default cert — fine for local dev, not for anything internet-reachable.
 2. **Set `GATEWAY_ALLOWED_IPS`** to Google's published outbound-gateway IP ranges for your
    Workspace instance (Admin console shows these when you configure the gateway in step 4).
    Never leave this empty in production — it's the only thing stopping arbitrary senders from
@@ -87,6 +117,23 @@ Real-world testing surfaced two things worth knowing before touching this again:
    with zero bounce, stop sending immediately (further bursts likely reinforce the suppression)
    and fall back to Workspace's own **Reporting → Email Log Search** for the authoritative
    per-message trace, rather than guessing from gateway logs alone.
+
+3. **Google's Outbound Gateway resubmits every message at least twice — deduplicate on
+   Message-ID.** A second real rollout attempt hit a different failure mode: the *same* message
+   got resubmitted by Google dozens of times over several minutes, each attempt succeeding
+   (`250 OK` from us every time), producing either a single email with the signature stacked
+   many times inside it, or — once an idempotency guard stopped the stacking — many separate
+   duplicate deliveries instead. Neither a faster gateway (connection pooling cut per-message
+   latency from ~4.7s to ~2.4s) nor the idempotency guard alone fixed the *resubmission* itself
+   — Google kept resubmitting at nearly the same cadence regardless of our response time, which
+   rules out a timeout/latency explanation. The actual fix: `dedupe.ts` tracks each `Message-ID`
+   in a short-lived in-memory cache and acks (without re-relaying) any repeat seen within 15
+   minutes. With that in place the real pattern became consistently clean: exactly one relay +
+   one deduped repeat per message, then done — confirmed across multiple senders and messages.
+   Root cause on Google's side is still unconfirmed (most likely redundant parallel delivery
+   attempts from their distributed MTA fleet, which a receiving gateway is expected to
+   deduplicate, same as any enterprise mail relay would) — but the fix doesn't depend on knowing
+   why, just on not assuming "resubmitted" means "failed."
 
 Given this, treat the rollout sequence below as needing a real multi-day warm-up pause between
 steps 4 and 6, not a same-day walkthrough.

@@ -20,6 +20,13 @@ export const config = {
     .map((ip) => ip.trim())
     .filter(Boolean),
 
+  // A real cert for STARTTLS (Let's Encrypt) instead of smtp-server's built-in default, whose
+  // private key is publicly known. Optional — omit both to fall back to the default (fine for
+  // local dev, not for anything reachable from the internet). See gateway/README.md for the
+  // certbot + deploy-hook setup that keeps these files current.
+  tlsCertPath: process.env.GATEWAY_TLS_CERT_PATH,
+  tlsKeyPath: process.env.GATEWAY_TLS_KEY_PATH,
+
   // The Signoff app's render endpoint (src/app/api/render/route.ts) and its shared secret.
   renderApiUrl: required("RENDER_API_URL"),
   renderApiSecret: required("RENDER_API_SECRET"),

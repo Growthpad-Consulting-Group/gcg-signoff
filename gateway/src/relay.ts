@@ -16,6 +16,15 @@ function getTransporter(): Transporter {
       port: config.relayPort,
       secure: false, // STARTTLS on 587
       auth: config.relayUser ? { user: config.relayUser, pass: config.relayPassword } : undefined,
+      // Without pooling, nodemailer opens a fresh TCP+TLS+AUTH handshake to
+      // smtp-relay.gmail.com for every single message — real-world testing showed this adds
+      // enough latency that Google's Outbound Gateway times out waiting for our SMTP response
+      // and retries, even though we ultimately do succeed (each retry logged "250 OK" on our
+      // side, yet Google kept resubmitting — a timing mismatch, not a failure). Pooling reuses
+      // one connection across messages, cutting per-message latency to roughly just the DATA
+      // transfer after the first message warms it up.
+      pool: true,
+      maxConnections: 3,
     });
   }
   return transporter;

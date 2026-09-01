@@ -6,6 +6,7 @@ import { appendToHtml, appendToText } from "./injectSignature.js";
 import { relayMessage } from "./relay.js";
 import { reportDeployStatus } from "./deployStatusClient.js";
 import { isIpAllowed } from "./ipMatch.js";
+import { isFirstDelivery } from "./dedupe.js";
 
 function isAllowed(remoteAddress: string): boolean {
   if (config.allowedClientIps.length === 0) {
@@ -32,6 +33,14 @@ const server = new SMTPServer({
       .then(async (parsed) => {
         const envelopeFrom = session.envelope.mailFrom ? session.envelope.mailFrom.address : "";
         const envelopeTo = session.envelope.rcptTo.map((r) => r.address);
+
+        // See dedupe.ts — Google's Outbound Gateway has been observed resubmitting the exact
+        // same message many times in quick succession, independent of our response latency.
+        // Ack success without re-processing rather than relaying (and thus delivering) it again.
+        if (!isFirstDelivery(parsed.messageId)) {
+          console.log(`[gateway] duplicate delivery of ${parsed.messageId} from ${envelopeFrom} — acked, not re-relayed`);
+          return callback();
+        }
 
         const signatureHtml = envelopeFrom ? await fetchSignatureHtml(envelopeFrom) : null;
 

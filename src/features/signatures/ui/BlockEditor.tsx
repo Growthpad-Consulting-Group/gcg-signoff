@@ -213,14 +213,12 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
         />
       ) : (
         // Unselected, this is raw HTML (not a live Tiptap instance yet), so a link inside it is a
-        // real, clickable <a> — the first click to select the block would also fire the anchor's
-        // own navigation. preventDefault on any click landing on a link stops that without
-        // blocking the click from bubbling up to select the block as normal.
-        <div
-          className="text-sm text-text-hi"
-          onClick={(e) => (e.target as HTMLElement).closest("a") && e.preventDefault()}
-          dangerouslySetInnerHTML={{ __html: block.html }}
-        />
+        // real, clickable <a> — clicking it to select the block also navigated. A click-time
+        // preventDefault() isn't reliable enough here (dnd-kit's own pointer listeners are also
+        // on this subtree), so pointer-events:none on every descendant <a> stops the browser from
+        // ever dispatching a click to the anchor at all — the click passes straight through to
+        // this div underneath it, which still bubbles up to select the block as normal.
+        <div className="text-sm text-text-hi [&_a]:pointer-events-none" dangerouslySetInnerHTML={{ __html: block.html }} />
       );
     case "image":
       // The merge tag isn't a real URL, so the canvas can't actually load it — show a clear

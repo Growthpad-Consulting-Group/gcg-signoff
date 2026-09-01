@@ -212,7 +212,15 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
           onInsertBlockAfter={(type) => actions.onInsertBlockAfter(block.id, type)}
         />
       ) : (
-        <div className="text-sm text-text-hi" dangerouslySetInnerHTML={{ __html: block.html }} />
+        // Unselected, this is raw HTML (not a live Tiptap instance yet), so a link inside it is a
+        // real, clickable <a> — the first click to select the block would also fire the anchor's
+        // own navigation. preventDefault on any click landing on a link stops that without
+        // blocking the click from bubbling up to select the block as normal.
+        <div
+          className="text-sm text-text-hi"
+          onClick={(e) => (e.target as HTMLElement).closest("a") && e.preventDefault()}
+          dangerouslySetInnerHTML={{ __html: block.html }}
+        />
       );
     case "image":
       // The merge tag isn't a real URL, so the canvas can't actually load it — show a clear

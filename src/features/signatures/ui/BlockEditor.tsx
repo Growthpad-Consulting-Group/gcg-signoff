@@ -150,7 +150,11 @@ function createContactRow(icon: string, text: string): Block {
     id: newBlockId(),
     type: "columns",
     columns: [
-      [{ id: newBlockId(), type: "image", src: CONTACT_ICON(icon), alt: icon, width: 28, height: 28, align: "left" }],
+      // shape: "circle" even though the source PNG is already a circle — the icon still needs
+      // Gmail's actual clip (the overflow:hidden wrapper blockSerializer adds for a circle
+      // shape), since Gmail can render a square image area slightly non-square inside its own
+      // narrow table cell, flattening an already-round source image into a squircle otherwise.
+      [{ id: newBlockId(), type: "image", src: CONTACT_ICON(icon), alt: icon, width: 28, height: 28, shape: "circle", align: "left" }],
       [{ id: newBlockId(), type: "text", html: `<p style="margin:0;font-size:13px;color:#374151;">${text}</p>` }],
     ],
     columnStyles: [{ width: 14 }, {}],
@@ -777,7 +781,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
           visually too. A dashed guide marks where the real signature width ends instead, so it's
           still visible without constraining the work area. */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
-        <div className="mx-auto w-full" style={{ maxWidth: Math.max(canvasWidth, 700) }}>
+        <div className="mx-auto w-full" style={{ maxWidth: Math.max(canvasWidth, 900) }}>
           <div className="relative rounded-lg bg-surface p-6 shadow-sm">
             {canvasWidth < 700 && (
               <div

@@ -300,7 +300,14 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
   // the handle drags in that case. Every other block (or a text block when not being edited)
   // drags from anywhere; PointerSensor's 8px activation distance already tells a genuine drag
   // apart from a plain click, so this doesn't fight the onClick-to-select below it.
-  const wholeBodyDraggable = !(block.type === "text" && selected);
+  //
+  // "columns" is excluded outright: its body can contain a nested, currently-editing text block
+  // several levels down, and `{...listeners}` includes dnd-kit's KeyboardSensor handler, which
+  // treats Space as "start a drag." Spread onto this wrapping div, that handler becomes an
+  // ancestor of that nested editor — a keypress inside it bubbles up and gets swallowed as a
+  // drag-start instead of typing a space. Handle-only dragging sidesteps that for every column,
+  // not just the one currently being typed in.
+  const wholeBodyDraggable = block.type !== "columns" && !(block.type === "text" && selected);
 
   return (
     <div

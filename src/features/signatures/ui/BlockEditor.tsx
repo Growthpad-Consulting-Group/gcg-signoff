@@ -14,6 +14,7 @@ import {
   ColumnStyle,
   ImageShape,
   cloneBlockWithNewIds,
+  computeColumnWidths,
   createBlock,
   findBlockById,
   findContainerPath,
@@ -203,7 +204,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
       );
     case "columns":
       return (
-        <div className="grid gap-4" style={{ gridTemplateColumns: block.columnStyles.map((cs) => cs.width ? `${cs.width}fr` : "1fr").join(" ") }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: computeColumnWidths(block.columnStyles).map((w) => `${w}%`).join(" ") }}>
           {block.columns.map((col, idx) => {
             const cs = block.columnStyles[idx] || {};
             const borderColor = cs.borderColor || "#e5e7eb";

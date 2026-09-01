@@ -1,5 +1,5 @@
 import type { Block } from "./blocks";
-import { imageBorderRadius } from "./blocks";
+import { computeColumnWidths, imageBorderRadius } from "./blocks";
 import { buildTrackedLinkHref, normalizeUrl } from "./trackedLink";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
@@ -72,13 +72,14 @@ function serializeBlock(block: Block, templateId?: string): string {
     }
 
     case "columns": {
+      const widths = computeColumnWidths(block.columnStyles);
       const tds = block.columns
         .map((col, idx) => {
           const cs = block.columnStyles[idx] || {};
           const borderColor = cs.borderColor || "#e5e7eb";
           const style = [
             "vertical-align:top",
-            cs.width ? `width:${cs.width}%` : "",
+            `width:${widths[idx]}%`,
             idx < block.columns.length - 1 ? "padding-right:12px" : "",
             cs.padding ? `padding:${cs.padding}px` : "",
             cs.backgroundColor ? `background-color:${cs.backgroundColor}` : "",

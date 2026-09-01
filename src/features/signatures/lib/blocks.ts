@@ -81,6 +81,19 @@ export interface ColumnsBlock {
   columnStyles: ColumnStyle[];
 }
 
+/** Resolves each column's actual width percentage, so "set one column, the rest fill the
+ * remainder" is an explicit calculation rather than left to whatever CSS/table layout happens to
+ * do by default. Columns without an explicit `width` split whatever's left over equally; if the
+ * explicit widths already add up to 100% or more, the rest just get 0 (an honest reflection of
+ * there being no room left, rather than silently overflowing past 100%). Shared by the editor's
+ * live preview and blockSerializer's HTML output so they never disagree with each other. */
+export function computeColumnWidths(styles: ColumnStyle[]): number[] {
+  const explicit = styles.reduce((sum, s) => sum + (s.width && s.width > 0 ? s.width : 0), 0);
+  const unsetCount = styles.filter((s) => !s.width || s.width <= 0).length;
+  const share = unsetCount > 0 ? Math.max(0, 100 - explicit) / unsetCount : 0;
+  return styles.map((s) => (s.width && s.width > 0 ? s.width : share));
+}
+
 /** Legacy/advanced-escape-hatch block — raw HTML passed through as-is. Every template that
  * predates this editor (or has no `blocks` yet) is represented as a single block of this type,
  * wrapping its existing `html` column, so nothing is lost or forced to convert. */

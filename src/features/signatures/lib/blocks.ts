@@ -69,6 +69,7 @@ export interface ColumnStyle {
   borderColor?: string;
   padding?: number;
   backgroundColor?: string;
+  width?: number; // percentage (1–99); unset = equal split
 }
 
 export interface ColumnsBlock {

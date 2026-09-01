@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, ReactRenderer } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
@@ -47,6 +47,48 @@ function ToolbarButton({ active, onClick, icon, title }: { active?: boolean; onC
     >
       <Icon icon={icon} className="h-3.5 w-3.5" />
     </button>
+  );
+}
+
+function MergeTagButton({ onInsert }: { onInsert: (tag: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        title="Insert merge tag"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((o) => !o)}
+        className={`rounded p-1.5 transition-colors ${open ? "bg-brand-500 text-white" : "text-text-lo hover:bg-surface-2 hover:text-text-hi"}`}
+      >
+        <Icon icon="solar:hashtag-broken" className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-app-border bg-surface py-1 shadow-lg">
+          {MERGE_TAGS.map((t) => (
+            <button
+              key={t.tag}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onInsert(t.tag); setOpen(false); }}
+              className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface-2"
+            >
+              <span className="text-text-lo">{t.label}</span>
+              <span className="font-mono text-brand-600">{`{{${t.tag}}}`}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -193,6 +235,11 @@ export default function RichTextEditor({
 
   return (
     <div onClick={(e) => e.stopPropagation()}>
+      {/* Persistent toolbar — always visible so merge tags and links are reachable on empty blocks */}
+      <div className="mb-1 flex items-center gap-0.5 rounded-lg border border-app-border bg-surface p-1">
+        <MergeTagButton onInsert={(tag) => editor.chain().focus().insertContent(`{{${tag}}}`).run()} />
+        <ToolbarButton title="Tracked link" icon="solar:link-broken" onClick={() => insertTrackedLinkAt(editor)} />
+      </div>
       <BubbleMenu editor={editor} className="flex items-center gap-0.5 rounded-lg border border-app-border bg-surface p-1 shadow-lg">
         <ToolbarButton title="Bold" icon="solar:text-bold-broken" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} />
         <ToolbarButton title="Italic" icon="solar:text-italic-broken" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} />
@@ -205,6 +252,8 @@ export default function RichTextEditor({
         <ToolbarButton title="Highlight" icon="solar:pen-broken" active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff1c2" }).run()} />
         <ToolbarButton title="Brand color text" icon="solar:palette-broken" active={editor.isActive("textStyle", { color: "#f05d23" })} onClick={() => editor.chain().focus().setColor("#f05d23").run()} />
         <ToolbarButton title="Link" icon="solar:link-broken" onClick={() => insertTrackedLinkAt(editor)} />
+        <div className="mx-0.5 h-4 w-px bg-app-border" />
+        <MergeTagButton onInsert={(tag) => editor.chain().focus().insertContent(`{{${tag}}}`).run()} />
       </BubbleMenu>
       <EditorContent editor={editor} />
     </div>

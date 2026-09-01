@@ -78,6 +78,7 @@ function serializeBlock(block: Block, templateId?: string): string {
           const borderColor = cs.borderColor || "#e5e7eb";
           const style = [
             "vertical-align:top",
+            cs.width ? `width:${cs.width}%` : "",
             idx < block.columns.length - 1 ? "padding-right:12px" : "",
             cs.padding ? `padding:${cs.padding}px` : "",
             cs.backgroundColor ? `background-color:${cs.backgroundColor}` : "",

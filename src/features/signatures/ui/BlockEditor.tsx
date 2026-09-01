@@ -21,6 +21,7 @@ import {
   imageBorderRadius,
   insertAfterId,
   insertIntoList,
+  newBlockId,
   removeBlockById,
   removeBlockWithResult,
   sameColumnPath,
@@ -97,6 +98,28 @@ const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
 // into side-by-side clickable pieces" use case this exists for), so the mini palette shown
 // inside a column omits it.
 const MINI_PALETTE = PALETTE.filter((p) => p.type !== "columns");
+
+/** A ready-made "photo + name/role side by side" layout — a `columns` block pre-filled with a
+ * per-staff photo and a text block carrying the two merge tags, rather than a new block type.
+ * Every piece (photo size/shape, column width, the text markup) is then just a normal, editable
+ * columns block once inserted — no special-cased "staff card" concept downstream. */
+function createStaffCardBlock(): Block {
+  return {
+    id: newBlockId(),
+    type: "columns",
+    columns: [
+      [{ id: newBlockId(), type: "image", src: "{{photo_url}}", alt: "{{full_name}}", width: 64, height: 64, shape: "circle", align: "left" }],
+      [
+        {
+          id: newBlockId(),
+          type: "text",
+          html: `<p style="margin:0;font-weight:bold;font-size:15px;color:#111827;">{{full_name}}</p><p style="margin:0;font-size:12px;color:#6b7280;">{{role_title}}</p>`,
+        },
+      ],
+    ],
+    columnStyles: [{ width: 20 }, {}],
+  };
+}
 
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 
@@ -180,7 +203,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
       );
     case "columns":
       return (
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${block.columns.length}, 1fr)` }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: block.columnStyles.map((cs) => cs.width ? `${cs.width}fr` : "1fr").join(" ") }}>
           {block.columns.map((col, idx) => {
             const cs = block.columnStyles[idx] || {};
             const borderColor = cs.borderColor || "#e5e7eb";
@@ -483,6 +506,11 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     setSelectedId(block.id);
   };
 
+  const addPresetBlock = (block: Block) => {
+    setBlocks((prev) => [...prev, block]);
+    setSelectedId(block.id);
+  };
+
   const removeBlock = (id: string) => {
     setBlocks((prev) => removeBlockById(prev, id));
     if (selectedId === id) setSelectedId(null);
@@ -614,11 +642,20 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
             <PaletteButton key={p.type} type={p.type} label={p.label} icon={p.icon} onClick={() => addBlock(p.type)} />
           ))}
         </div>
+
+        <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-text-lo">Presets</p>
+        <button
+          onClick={() => addPresetBlock(createStaffCardBlock())}
+          className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
+        >
+          <Icon icon="solar:user-id-broken" className="h-4 w-4 text-brand-600" />
+          Staff card (photo + name/role)
+        </button>
       </div>
 
       {/* Canvas */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
-        <div className="mx-auto w-full max-w-[600px]">
+        <div className="mx-auto w-full max-w-4xl">
           <div className="rounded-lg bg-surface p-6 shadow-sm">
             <BlockList blocks={blocks} path={null} actions={actions} />
           </div>
@@ -847,6 +884,18 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                           <input type="color" value={cs.backgroundColor || "#ffffff"} onChange={(e) => updateColumnStyle({ backgroundColor: e.target.value })} className="h-8 w-full rounded-lg border border-app-border" />
                         </Field>
                       </div>
+                      <Field label="Width (%)">
+                        <input
+                          type="number"
+                          value={cs.width || ""}
+                          onChange={(e) => updateColumnStyle({ width: e.target.value ? Number(e.target.value) : undefined })}
+                          placeholder="Equal"
+                          min={1}
+                          max={99}
+                          className={inputClass}
+                        />
+                        <p className="mt-1 text-xs text-text-lo">Leave blank for equal widths. Set one column and the rest fill the remainder.</p>
+                      </Field>
                       <Field label="Padding (px)">
                         <input type="number" value={cs.padding || 0} onChange={(e) => updateColumnStyle({ padding: Number(e.target.value) || 0 })} className={inputClass} />
                       </Field>

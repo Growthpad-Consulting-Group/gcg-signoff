@@ -102,13 +102,19 @@ function serializeBlock(block: Block, templateId?: string): string {
   }
 }
 
+/** The canvas/export width when a template hasn't set its own — a real signature width, not the
+ * wide canvas shown while editing. Shared with BlockEditor's live preview so they always agree. */
+export const DEFAULT_CANVAS_WIDTH = 600;
+
 /**
  * Renders a block tree into inline-styled, table-based HTML — the only layout rules email
  * clients actually respect (Outlook renders with Word's engine: no flexbox/grid, no external
  * stylesheets). This becomes the new `html` column value, the same role GrapesJS's
- * `editor.getHtml()` played before.
+ * `editor.getHtml()` played before. `canvasWidth` is the "master" width nothing inside is meant
+ * to exceed — set as a real pixel width on the outer table (not just 100%, which would let the
+ * signature stretch to whatever width the recipient's mail client gives it).
  */
-export function serializeBlocks(blocks: Block[], templateId?: string): string {
+export function serializeBlocks(blocks: Block[], templateId?: string, canvasWidth: number = DEFAULT_CANVAS_WIDTH): string {
   // A lone "html" block (the legacy-template case) needs no outer wrapping table — it's
   // typically already a complete `<table>...</table>` document on its own.
   if (blocks.length === 1 && blocks[0].type === "html") {
@@ -116,5 +122,5 @@ export function serializeBlocks(blocks: Block[], templateId?: string): string {
   }
 
   const rows = blocks.map((b) => serializeBlock(b, templateId)).join("\n");
-  return `<table cellpadding="0" cellspacing="0" border="0" width="100%">\n${rows}\n</table>`;
+  return `<table cellpadding="0" cellspacing="0" border="0" width="${canvasWidth}" style="width:${canvasWidth}px;max-width:100%;">\n${rows}\n</table>`;
 }

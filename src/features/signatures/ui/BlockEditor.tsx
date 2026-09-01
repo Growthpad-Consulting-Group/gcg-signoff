@@ -30,7 +30,7 @@ import {
   updateColumnList,
   wrapLegacyHtml,
 } from "@/features/signatures/lib/blocks";
-import { serializeBlocks } from "@/features/signatures/lib/blockSerializer";
+import { DEFAULT_CANVAS_WIDTH, serializeBlocks } from "@/features/signatures/lib/blockSerializer";
 
 // dnd-kit droppable ids for each list's *container* (distinct from any block's own id) — needed
 // so an empty column, which otherwise has nothing to be "over", is still a valid drop target,
@@ -76,7 +76,7 @@ const presetDragId = (id: string) => `${PRESET_DRAG_PREFIX}${id}`;
 const presetIdFromDragId = (id: string): string | null => (id.startsWith(PRESET_DRAG_PREFIX) ? id.slice(PRESET_DRAG_PREFIX.length) : null);
 
 export interface BlockEditorHandle {
-  getExport: () => { blocks: Block[]; html: string };
+  getExport: () => { blocks: Block[]; html: string; canvasWidth: number };
   undo: () => void;
   redo: () => void;
 }
@@ -85,6 +85,10 @@ interface BlockEditorProps {
   templateId: string;
   initialBlocks: Block[] | null;
   initialHtml: string;
+  // The "master" width (px) nothing added to the canvas is meant to exceed — a real signature
+  // width, not the wide canvas shown while editing. null/undefined (a template that predates
+  // this setting) falls back to DEFAULT_CANVAS_WIDTH.
+  initialCanvasWidth?: number | null;
   onChange: (blocks: Block[], html: string) => void;
   // Lets the page render its own Undo/Redo buttons in the top toolbar (alongside History/
   // Delete/Preview/Save) rather than as an isolated, easy-to-miss pair of icons floating above
@@ -460,10 +464,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = "w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500";
 
 const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function BlockEditor(
-  { templateId, initialBlocks, initialHtml, onChange, onHistoryChange },
+  { templateId, initialBlocks, initialHtml, initialCanvasWidth, onChange, onHistoryChange },
   ref
 ) {
   const [blocks, setBlocks] = useState<Block[]>(() => (initialBlocks && initialBlocks.length > 0 ? initialBlocks : wrapLegacyHtml(initialHtml)));
+  const [canvasWidth, setCanvasWidth] = useState<number>(initialCanvasWidth || DEFAULT_CANVAS_WIDTH);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
   // Label shown in the DragOverlay while dragging a *new* block in from the palette — sortable
@@ -531,29 +536,30 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const selected = selectedId ? findBlockById(blocks, selectedId) : null;
 
   useImperativeHandle(ref, () => ({
-    getExport: () => ({ blocks, html: serializeBlocks(blocks, templateId) }),
+    getExport: () => ({ blocks, html: serializeBlocks(blocks, templateId, canvasWidth), canvasWidth }),
     undo,
     redo,
   }));
 
   // Fires once immediately on mount (so the page's preview/autosave state reflects the initial
-  // content right away, matching GrapesEditor's "load" event) and debounced on every edit after.
+  // content right away, matching GrapesEditor's "load" event) and debounced on every edit after
+  // — including a canvasWidth change, which also needs to autosave and re-render the preview.
   const mountedRef = useRef(false);
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
-      onChangeRef.current(blocks, serializeBlocks(blocks, templateId));
+      onChangeRef.current(blocks, serializeBlocks(blocks, templateId, canvasWidth));
       return;
     }
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
-      onChangeRef.current(blocks, serializeBlocks(blocks, templateId));
+      onChangeRef.current(blocks, serializeBlocks(blocks, templateId, canvasWidth));
     }, 500);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks]);
+  }, [blocks, canvasWidth]);
 
   // Commits `lastSnapshotRef` (the state from before this burst of edits) onto the undo stack
   // once edits settle, then moves the snapshot forward — one undo step per pause in editing.
@@ -758,10 +764,11 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         </div>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas — capped at canvasWidth, the "master" width nothing added is meant to exceed
+          (matches the real px width the exported HTML's outer table is given). */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
-        <div className="mx-auto w-full max-w-4xl">
-          <div className="rounded-lg bg-surface p-6 shadow-sm">
+        <div className="mx-auto w-full" style={{ maxWidth: canvasWidth }}>
+          <div className="overflow-hidden rounded-lg bg-surface p-6 shadow-sm">
             <BlockList blocks={blocks} path={null} actions={actions} />
           </div>
         </div>
@@ -771,7 +778,26 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
       <div className="w-80 shrink-0 overflow-y-auto border-l border-app-border bg-surface p-4">
         <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Settings</p>
         {!selected ? (
-          <p className="text-sm text-text-lo">Select a block to edit its settings.</p>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-app-border p-3">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Template</p>
+              <Field label="Content width (px)">
+                <input
+                  type="number"
+                  value={canvasWidth}
+                  onChange={(e) => setCanvasWidth(Math.max(200, Math.min(1000, Number(e.target.value) || DEFAULT_CANVAS_WIDTH)))}
+                  min={200}
+                  max={1000}
+                  className={inputClass}
+                />
+              </Field>
+              <p className="mt-1.5 text-xs text-text-lo">
+                The master width for this signature — every block is capped to fit inside it. 600px is the standard email-signature
+                width; most inboxes crop or scroll anything wider.
+              </p>
+            </div>
+            <p className="text-sm text-text-lo">Select a block to edit its settings.</p>
+          </div>
         ) : (
           <div className="space-y-3">
             {selected.type === "text" && (

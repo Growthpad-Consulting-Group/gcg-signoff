@@ -40,6 +40,7 @@ export default function TemplateEditorPage() {
   const [description, setDescription] = useState("");
   const [initialHtml, setInitialHtml] = useState("");
   const [initialBlocks, setInitialBlocks] = useState<Block[] | null>(null);
+  const [initialCanvasWidth, setInitialCanvasWidth] = useState<number | null>(null);
   const [previewHtml, setPreviewHtml] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -78,6 +79,7 @@ export default function TemplateEditorPage() {
       setDescription(template.description || "");
       setInitialHtml(template.html || "");
       setInitialBlocks(template.blocks || null);
+      setInitialCanvasWidth(template.canvas_width ?? null);
       setPreviewHtml(template.html || "");
       setStaffOptions(staffRes.staff || []);
       setLoading(false);
@@ -96,6 +98,7 @@ export default function TemplateEditorPage() {
     const { template } = await res.json();
     setInitialHtml(template.html || "");
     setInitialBlocks(template.blocks || null);
+    setInitialCanvasWidth(template.canvas_width ?? null);
     setPreviewHtml(template.html || "");
     setEditorKey((k) => k + 1);
   };
@@ -130,7 +133,7 @@ export default function TemplateEditorPage() {
         name,
         description,
         silent,
-        ...(exported ? { html: exported.html, blocks: exported.blocks } : {}),
+        ...(exported ? { html: exported.html, blocks: exported.blocks, canvas_width: exported.canvasWidth } : {}),
       }),
     });
 
@@ -290,6 +293,7 @@ export default function TemplateEditorPage() {
           templateId={id}
           initialBlocks={initialBlocks}
           initialHtml={initialHtml}
+          initialCanvasWidth={initialCanvasWidth}
           onChange={(_blocks, html) => {
             setPreviewHtml(html);
             scheduleAutosave();

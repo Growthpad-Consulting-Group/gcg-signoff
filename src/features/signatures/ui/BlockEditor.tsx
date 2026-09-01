@@ -122,6 +122,40 @@ function createStaffCardBlock(): Block {
   };
 }
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://signoff.growthpad.co.ke";
+const CONTACT_ICON = (icon: string) => `${APP_URL}/assets/icons/contact/${icon}.svg`;
+
+/** One icon-in-a-circle + text row (phone/mobile/address/website) — a `columns` block just like
+ * the staff card, so it stays fully editable (swap the icon, edit the text, resize the columns)
+ * rather than being a one-off special case. */
+function createContactRow(icon: string, text: string): Block {
+  return {
+    id: newBlockId(),
+    type: "columns",
+    columns: [
+      [{ id: newBlockId(), type: "image", src: CONTACT_ICON(icon), alt: icon, width: 28, height: 28, align: "left" }],
+      [{ id: newBlockId(), type: "text", html: `<p style="margin:0;font-size:13px;color:#374151;">${text}</p>` }],
+    ],
+    columnStyles: [{ width: 14 }, {}],
+  };
+}
+
+/** A ready-made 4-row "contact details" block: phone, mobile, address, website, each with a
+ * circular brand-colored icon — built from the same primitives as the staff card. Phone/mobile
+ * use the real merge tags; address/website have no merge tag (they're not per-staff data), so
+ * they land as plain editable placeholder text instead. */
+function createContactDetailsBlocks(): Block[] {
+  return [
+    createContactRow("phone", "{{phone}}"),
+    { id: newBlockId(), type: "spacer", height: 8 },
+    createContactRow("mobile", "{{mobile}}"),
+    { id: newBlockId(), type: "spacer", height: 8 },
+    createContactRow("location", "Your office address"),
+    { id: newBlockId(), type: "spacer", height: 8 },
+    createContactRow("website", "www.example.com"),
+  ];
+}
+
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 
 interface ListActions {
@@ -512,6 +546,12 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
     setSelectedId(block.id);
   };
 
+  const addPresetBlocks = (newBlocks: Block[]) => {
+    if (newBlocks.length === 0) return;
+    setBlocks((prev) => [...prev, ...newBlocks]);
+    setSelectedId(newBlocks[0].id);
+  };
+
   const removeBlock = (id: string) => {
     setBlocks((prev) => removeBlockById(prev, id));
     if (selectedId === id) setSelectedId(null);
@@ -645,13 +685,22 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         </div>
 
         <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-text-lo">Presets</p>
-        <button
-          onClick={() => addPresetBlock(createStaffCardBlock())}
-          className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
-        >
-          <Icon icon="solar:user-id-broken" className="h-4 w-4 text-brand-600" />
-          Staff card (photo + name/role)
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={() => addPresetBlock(createStaffCardBlock())}
+            className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
+          >
+            <Icon icon="solar:user-id-broken" className="h-4 w-4 text-brand-600" />
+            Staff card (photo + name/role)
+          </button>
+          <button
+            onClick={() => addPresetBlocks(createContactDetailsBlocks())}
+            className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi transition-colors hover:bg-surface-2"
+          >
+            <Icon icon="solar:phone-broken" className="h-4 w-4 text-brand-600" />
+            Contact details (icons)
+          </button>
+        </div>
       </div>
 
       {/* Canvas */}

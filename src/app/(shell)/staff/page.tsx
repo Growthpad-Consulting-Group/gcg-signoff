@@ -11,6 +11,8 @@ import Button from "@/shared/ui/Button";
 import GenericEmptyState from "@/shared/ui/EmptyState";
 import MediaPicker from "@/shared/ui/MediaPicker";
 
+import DepartmentManager from "@/features/staff/ui/DepartmentManager";
+
 interface Domain {
   id: string;
   name: string;

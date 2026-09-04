@@ -52,7 +52,7 @@ function serializeBlock(block: Block, templateId?: string): string {
       const content = href
         ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${wrappedImg}</a>`
         : wrappedImg;
-      const paddingStyle = block.padding ? `padding:${block.padding}px;` : "";
+      const paddingStyle = block.paddingY || block.paddingX ? `padding:${block.paddingY || 0}px ${block.paddingX || 0}px;` : "";
       return `<tr><td style="${paddingStyle}${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 

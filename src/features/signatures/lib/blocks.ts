@@ -23,7 +23,8 @@ export interface ImageBlock {
   height?: number; // px — unset means auto (preserve source aspect ratio)
   shape?: ImageShape; // unset behaves as "square"
   align: Align;
-  padding?: number; // px — spacing around the image
+  paddingX?: number; // px — left/right spacing around the image
+  paddingY?: number; // px — top/bottom spacing around the image
   linkUrl?: string;
   linkLabel?: string;
 }

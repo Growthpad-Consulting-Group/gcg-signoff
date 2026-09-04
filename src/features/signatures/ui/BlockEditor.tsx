@@ -225,7 +225,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
       // placeholder instead of what would otherwise just look like a broken image.
       if (block.src === "{{photo_url}}") {
         return (
-          <div style={{ padding: block.padding }}>
+          <div style={{ paddingTop: block.paddingY, paddingBottom: block.paddingY, paddingLeft: block.paddingX, paddingRight: block.paddingX }}>
             <div
               className={`flex items-center justify-center border border-dashed border-app-border bg-surface-2/60 text-text-lo ${block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}`}
               style={{ width: block.width, height: block.height || block.width, borderRadius: imageBorderRadius(block.shape) }}
@@ -237,7 +237,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
       }
       return block.src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <div style={{ padding: block.padding }}>
+        <div style={{ paddingTop: block.paddingY, paddingBottom: block.paddingY, paddingLeft: block.paddingX, paddingRight: block.paddingX }}>
           <img
             src={block.src}
             alt={block.alt}
@@ -903,9 +903,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                     <option value="right">Right</option>
                   </select>
                 </Field>
-                <Field label="Padding (px)">
-                  <input type="number" min="0" value={selected.padding || 0} onChange={(e) => updateBlock(selected.id, { padding: Number(e.target.value) || undefined })} className={inputClass} />
-                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Left/Right padding (px)">
+                    <input type="number" min="0" value={selected.paddingX || 0} onChange={(e) => updateBlock(selected.id, { paddingX: Number(e.target.value) || undefined })} className={inputClass} />
+                  </Field>
+                  <Field label="Top/Bottom padding (px)">
+                    <input type="number" min="0" value={selected.paddingY || 0} onChange={(e) => updateBlock(selected.id, { paddingY: Number(e.target.value) || undefined })} className={inputClass} />
+                  </Field>
+                </div>
                 <Field label="Link URL (tracked)">
                   <input
                     value={selected.linkUrl || ""}

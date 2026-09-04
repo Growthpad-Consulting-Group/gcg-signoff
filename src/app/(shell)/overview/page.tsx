@@ -9,6 +9,8 @@ import DomainHealthStrip from "@/features/dashboard/ui/DomainHealthStrip";
 import RecentActivity from "@/features/dashboard/ui/RecentActivity";
 import CampaignSummary from "@/features/campaigns/ui/CampaignSummary";
 
+import TemplateLinkAnalytics from "@/features/dashboard/ui/TemplateLinkAnalytics";
+
 // Recharts is ~1MB — defer it out of the initial dashboard bundle so stat cards paint first.
 const DeployStatusChart = dynamic(() => import("@/features/dashboard/ui/DeployStatusChart"), {
   ssr: false,
@@ -164,6 +166,11 @@ export default function OverviewPage() {
             <h2 className="mb-3 font-display text-sm font-semibold text-text-hi">Campaign performance</h2>
             <CampaignSummary />
           </div>
+
+          <div className="rounded-2xl border border-app-border bg-surface p-5 shadow-sm">
+            <TemplateLinkAnalytics />
+          </div>
+
         </div>
       </div>
     </div>

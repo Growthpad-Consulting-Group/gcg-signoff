@@ -620,6 +620,10 @@ function StaffPageInner() {
           { label: "Add staff", icon: "solar:user-plus-broken", variant: "primary", onClick: () => setShowAdd(true), disabled: domains.length === 0 },
         ]}
       />
+      <div className="flex items-center gap-2 px-6 py-4">
+        <DepartmentManager />
+      </div>
+
 
       {!loading && domains.length === 0 && (
         <GenericEmptyState

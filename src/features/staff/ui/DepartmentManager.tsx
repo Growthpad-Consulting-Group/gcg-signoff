@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
-import SimpleModal from "@/shared/ui/SimpleModal";
+import Slideover from "@/shared/ui/Slideover";
 import Button from "@/shared/ui/Button";
 
 interface Department {
@@ -98,7 +98,7 @@ export default function DepartmentManager() {
         Manage departments
       </button>
 
-      <SimpleModal isOpen={isOpen} onClose={() => setIsOpen(false)} title="Manage departments" width="max-w-md">
+      <Slideover isOpen={isOpen} onClose={() => setIsOpen(false)} title="Manage departments">
         <div className="space-y-3">
           <div className="flex gap-2">
             <input
@@ -135,7 +135,7 @@ export default function DepartmentManager() {
             </div>
           )}
         </div>
-      </SimpleModal>
+      </Slideover>
     </>
   );
 }

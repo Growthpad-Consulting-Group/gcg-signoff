@@ -2,10 +2,11 @@
 
 ## Current State (Sep 4, 2026)
 
-**Status:** Paused pending OCI port 25 unblock  
-**Code:** Phase 1 complete and deployed to `/opt/signoff-gateway` on `145.241.124.158`  
-**Service:** Stopped and disabled  
+**Status:** Decommissioned in favor of Gmail API push  
+**Code:** Phase 1 complete but not in production use (available for future reference)  
+**Service:** Stopped and disabled on server  
 **Outbound Gateway:** Disabled in Admin console  
+**Production Mechanism:** Gmail API signature push (compose signatures only)  
 
 ## What's Ready
 
@@ -62,15 +63,22 @@ Upgrading to a paid tenancy would unlock both, but:
    sudo journalctl -u signoff-gateway -f
    ```
 
-## Fallback: Gmail API Push
+## Production Mechanism: Gmail API Push (Final Decision)
 
-If OCI port 25 remains unavailable, the Gmail API signature push mechanism remains production-ready:
-- Compose signatures work reliably
-- Reply signatures still absent (known limitation)
-- Zero network/firewall issues
-- No warm-up required
+**Chosen:** Gmail API signature push via `src/features/signatures/lib/gmailSync.ts`
 
-Switch back by disabling Outbound Gateway and using `/staff` page sync buttons.
+**Why:** 
+- Proven to work reliably across all Workspace accounts
+- Zero infrastructure/network/firewall issues
+- No warm-up period required
+- Easy to manage via `/staff` page sync buttons
+- OCI Free Tier + Gmail API = no additional costs or compatibility gaps
+
+**Known limitation:** Pushed signatures apply to new compose only, not replies.
+- This is a Google API constraint, not a bug in our implementation
+- Acceptable trade-off for reliability and simplicity
+
+**Gateway (Option A) decision:** Code remains in the repo for historical reference and future use if requirements change. Not recommended for production on Free Tier OCI or without paid infrastructure upgrade.
 
 ## Reference
 

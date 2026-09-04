@@ -100,23 +100,28 @@ client. A third-party IMAP client (Outlook desktop, Apple Mail, Thunderbird) rea
 local signature setting instead and never sees this. For a Workspace-native team where
 everyone actually uses Gmail day to day, that's likely no loss in practice.
 
-**Update (Sep 2026) — the gateway is decommissioned, not just paused.** Further investigation
-found the "accepted then never arrives" failure wasn't IP warm-up — it's a structural loop:
-Google's Outbound Gateway rule has no scoping/exception options and unconditionally re-matches
-any mail this gateway relays back out via `smtp-relay.gmail.com`, since that copy is still
-authenticated as the original `@growthpad.net` sender. The message loops back to the same
-gateway instead of ever reaching the recipient's real MX, and the Message-ID dedup guard (added
-for an earlier, different symptom) silently absorbs the loop instead of surfacing it — so logs
-look clean while nothing is delivered. No Admin console setting breaks this loop. Full trace and
-the two considered fixes (build a real outbound MTA vs. drop the gateway) are in
-`gateway/README.md`'s "Status: decommissioned" section. Decision: drop it.
+**Final decision (Sep 2026) — Gmail API push is the production mechanism.** After thorough
+investigation of the Outbound Gateway + SMTP relay path:
 
-**Current mechanism: Gmail API push only.** Use `/staff` page → "Sync" per person, or "Sync all
-to Gmail" — this is now the sole signature-delivery mechanism, not a primary-with-fallback. Its
-known limitation stands: pushed signatures apply to newly composed mail in Gmail's web/app
-client only, not replies, and not third-party IMAP clients (Outlook desktop, Apple Mail,
-Thunderbird). Outbound Gateway and the SMTP relay service should stay **disabled** in Admin
-console — the gateway code and docs remain in the repo for reference only.
+1. **Architectural loop discovered:** Google's Outbound Gateway rule has no scoping/exception
+   options and unconditionally re-matches mail the gateway relays back out via
+   `smtp-relay.gmail.com`. Since that relayed copy is still authenticated as the original
+   `@growthpad.net` sender, it loops back to the gateway indefinitely (the Message-ID dedup
+   guard silently absorbs it, making logs look clean while nothing is delivered).
+
+2. **OCI infrastructure constraint:** Free Tier OCI blocks outbound SMTP port 25, preventing
+   direct MTA delivery to recipient mail servers. Building a full outbound MTA (Phase 1 code
+   exists) would require paid infrastructure with zero guarantee of working reliably for this
+   domain.
+
+3. **Preferred solution:** Gmail API push via `sendAs.signature` is proven, simple, and fully
+   operational now. Its known limitation — signatures only on newly composed mail, not replies —
+   is a documented Google API constraint, not a bug in our implementation.
+
+**Production mechanism: Gmail API push only.** Use `/staff` page → "Sync" per person, or "Sync
+all to Gmail". Outbound Gateway and the SMTP relay service are **disabled** in Admin console.
+The gateway Phase 1 code remains in the repo for historical reference; not recommended for
+production deployment.
 
 **Setup required, one-time:** the Gmail push needs a Google Cloud service account authorized
 for domain-wide delegation:
@@ -135,14 +140,14 @@ This is an internal tool acting only within your own domain, so it does **not** 
 public OAuth app verification/security-assessment process — that process exists for apps
 requesting consent from accounts outside your organization, which doesn't apply here.
 
-## 4. DNS, SPF, and DKIM — what's actually required
+## 4. DNS, SPF, and DKIM — not required for Gmail API push
 
-The Outbound Gateway is **not** an MX record change — inbound mail is untouched, and this is
-configured entirely in Workspace's Admin console (a hostname/IP for the gateway), not DNS.
+With the Gmail API push mechanism, no DNS or authentication changes are needed. Google remains
+the sender at every hop; the app only updates the signature field in Workspace's sendAs settings.
+SPF, DKIM, and DMARC all remain unchanged.
 
-The one DNS change needed: add the gateway's sending IP to the domain's **SPF** record
-(`include:` the gateway) so Google's outbound authentication still passes once mail has been
-through it. If the gateway re-signs the message, it also needs its own **DKIM** key published.
+*(Note: If the Outbound Gateway path is revisited in future, the DNS section below would apply.
+Kept for reference only.)*
 Both are TXT record edits — one-time, low-risk, and exactly what the "don't mind adding DNS
 records" tolerance from the original scoping conversation covers. No MX changes, ever, for this
 domain's inbound mail.

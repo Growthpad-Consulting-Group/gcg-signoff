@@ -17,9 +17,26 @@
 
 ## What's Blocked
 
-**OCI VCN Security List:** Outbound SMTP (port 25, TCP) is blocked.
+### Primary Blocker: OCI VCN Security List
 
-Direct SMTP delivery to recipient mail servers requires port 25 — there is no alternative. The gateway tested successfully against Gmail's MX servers during development, but the OCI instance cannot reach port 25 outbound.
+**Outbound SMTP (port 25, TCP) is blocked.** Direct SMTP delivery to recipient mail servers requires port 25 — there is no alternative. The gateway tested successfully against Gmail's MX servers during development, but the OCI instance cannot reach port 25 outbound.
+
+### Secondary (Non-Critical): PTR Record
+
+**Reverse DNS (PTR) not available on Free Tier.** OCI declined the PTR request because the tenancy is on Trial/Free Tier. PTR records help with mail reputation/warm-up but are not strictly required for delivery. Upgrading to a paid OCI tenancy would unlock this feature, but it's not a blocker for Phase 1.
+
+## Oracle Free Tier Considerations
+
+The current OCI setup is on a Free Tier tenancy, which has two limitations:
+1. **Port 25 is blocked** (affects this project)
+2. **PTR records unavailable** (affects mail reputation, not delivery itself)
+
+Upgrading to a paid tenancy would unlock both, but:
+- Free Tier is sufficient if port 25 gets unblocked (unlikely on Free Tier)
+- Paid tenancy is the real solution for production mail infrastructure
+- Cost: varies by usage, but typically $20-50/month for a small mail gateway instance
+
+**Decision:** Keep Free Tier for now since it's an experimental feature. If the gateway becomes mission-critical, migrate to paid tier.
 
 ## To Resume When Port 25 Unblocked
 

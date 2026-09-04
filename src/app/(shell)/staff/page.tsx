@@ -620,11 +620,6 @@ function StaffPageInner() {
           { label: "Add staff", icon: "solar:user-plus-broken", variant: "primary", onClick: () => setShowAdd(true), disabled: domains.length === 0 },
         ]}
       />
-      <div className="flex items-center gap-2 px-6 py-4">
-        <DepartmentManager />
-      </div>
-
-
       {!loading && domains.length === 0 && (
         <GenericEmptyState
           icon="solar:global-broken"
@@ -644,14 +639,17 @@ function StaffPageInner() {
       )}
 
       {staff.length > 0 && (
-        <div className="mb-3 relative max-w-xs">
-          <Icon icon="solar:magnifer-broken" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-lo" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full rounded-lg border border-app-border bg-surface py-2 pl-9 pr-3 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+        <div className="mb-3 flex items-center gap-3">
+          <div className="relative flex-1">
+            <Icon icon="solar:magnifer-broken" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-lo" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full rounded-lg border border-app-border bg-surface py-2 pl-9 pr-3 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <DepartmentManager />
         </div>
       )}
 

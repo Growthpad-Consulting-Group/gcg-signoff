@@ -33,13 +33,13 @@ export default function TemplateLinkAnalytics() {
   if (!analytics || analytics.totalClicks === 0) {
     return (
       <div className="rounded-lg border border-app-border bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-            <Icon icon="solar:click-broken" className="h-5 w-5" />
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+            <Icon icon="solar:link-broken" className="h-5 w-5" />
           </div>
-          <div>
-            <p className="text-sm font-medium text-text-hi">Template link clicks</p>
-            <p className="text-xs text-text-lo">No clicks yet — links in signatures appear here</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-hi block">Template link clicks</p>
+            <p className="text-xs text-text-lo block mt-1">No clicks yet — links in signatures appear here</p>
           </div>
         </div>
       </div>
@@ -52,7 +52,7 @@ export default function TemplateLinkAnalytics() {
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
-              <Icon icon="solar:click-broken" className="h-5 w-5" />
+              <Icon icon="solar:link-broken" className="h-5 w-5" />
             </div>
             <div>
               <p className="text-sm font-medium text-text-hi">Template link clicks</p>

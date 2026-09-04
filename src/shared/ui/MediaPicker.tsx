@@ -32,6 +32,7 @@ export default function MediaPicker({
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -140,7 +141,22 @@ export default function MediaPicker({
       )}
 
       {tab === "upload" && (
-        <div className="flex flex-col items-center gap-3 py-8">
+        <div
+          className={`flex flex-col items-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors ${
+            dragOver ? "border-brand-500 bg-brand-500/5" : "border-app-border"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) upload(file);
+          }}
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -161,6 +177,7 @@ export default function MediaPicker({
             {uploading ? <Icon icon="solar:loading-bold" className="h-4 w-4 animate-spin" /> : <Icon icon="solar:gallery-add-broken" className="h-4 w-4" />}
             {uploading ? uploadStatus || "Uploading…" : "Choose a file"}
           </button>
+          <p className="text-center text-xs text-text-lo">or drag and drop your image here</p>
           <p className="text-center text-xs text-text-lo">Large files (including GIFs) are automatically resized and compressed.</p>
         </div>
       )}

@@ -110,5 +110,5 @@ server.on("error", (err) => console.error("[gateway] SMTP server error:", err));
 server.listen(config.smtpPort, config.smtpHost, () => {
   console.log(`[gateway] listening on ${config.smtpHost}:${config.smtpPort}`);
   console.log(`[gateway] render API: ${config.renderApiUrl}`);
-  console.log(`[gateway] relaying via: ${config.relayHost}:${config.relayPort}`);
+  console.log(`[gateway] delivery: direct MTA (MX lookups to recipient servers)`);
 });

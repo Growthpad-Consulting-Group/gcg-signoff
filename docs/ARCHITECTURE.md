@@ -100,12 +100,23 @@ client. A third-party IMAP client (Outlook desktop, Apple Mail, Thunderbird) rea
 local signature setting instead and never sees this. For a Workspace-native team where
 everyone actually uses Gmail day to day, that's likely no loss in practice.
 
-**Recommended default:** use the Gmail push (`/staff` page → "Sync" per person, or "Sync all
-to Gmail") as the primary mechanism. Leave the gateway's Outbound Gateway setting **disabled**
-by default — keep the gateway deployed and ready, but only switch it on selectively for a
-specific person who genuinely needs a non-Gmail client covered. Running both live for the same
-person at the same time double-signs their mail (Gmail's native signature, then the gateway
-appending another copy in transit) — don't do that.
+**Update (Sep 2026) — the gateway is decommissioned, not just paused.** Further investigation
+found the "accepted then never arrives" failure wasn't IP warm-up — it's a structural loop:
+Google's Outbound Gateway rule has no scoping/exception options and unconditionally re-matches
+any mail this gateway relays back out via `smtp-relay.gmail.com`, since that copy is still
+authenticated as the original `@growthpad.net` sender. The message loops back to the same
+gateway instead of ever reaching the recipient's real MX, and the Message-ID dedup guard (added
+for an earlier, different symptom) silently absorbs the loop instead of surfacing it — so logs
+look clean while nothing is delivered. No Admin console setting breaks this loop. Full trace and
+the two considered fixes (build a real outbound MTA vs. drop the gateway) are in
+`gateway/README.md`'s "Status: decommissioned" section. Decision: drop it.
+
+**Current mechanism: Gmail API push only.** Use `/staff` page → "Sync" per person, or "Sync all
+to Gmail" — this is now the sole signature-delivery mechanism, not a primary-with-fallback. Its
+known limitation stands: pushed signatures apply to newly composed mail in Gmail's web/app
+client only, not replies, and not third-party IMAP clients (Outlook desktop, Apple Mail,
+Thunderbird). Outbound Gateway and the SMTP relay service should stay **disabled** in Admin
+console — the gateway code and docs remain in the repo for reference only.
 
 **Setup required, one-time:** the Gmail push needs a Google Cloud service account authorized
 for domain-wide delegation:

@@ -1,20 +1,20 @@
 # Signoff Gateway
 
-The outbound mail hop that stamps a staff member's signature onto their mail before Google
-Workspace delivers it. See `docs/ARCHITECTURE.md` in the repo root for why this exists and how
-it fits together — short version:
+The outbound mail hop that stamps a staff member's signature onto their mail, then delivers
+it directly to recipient mail servers. See `docs/ARCHITECTURE.md` in the repo root for why this
+exists and how it fits together — short version:
 
 ```
-sender (any client/device) → Google Workspace → [this gateway] → Google SMTP Relay → recipient
-                                                        │
-                                                        ▼
+sender (any client/device) → Google Workspace → [this gateway] → MX lookup & direct delivery → recipient
+                                  (Outbound Gateway rule)      │
+                                                               ▼
                                          GET /api/render?email=sender (the Next.js app)
 ```
 
-Google still performs SPF/DKIM and actual internet delivery via its SMTP Relay service — this
-gateway only receives the message, asks the app for the sender's rendered signature, appends
-it, and hands the message back. It never resolves MX records or retries failed deliveries
-itself.
+This gateway receives mail from Google Workspace's Outbound Gateway, fetches the sender's
+rendered signature from the app, appends it, performs MX lookups for each recipient domain, and
+delivers directly to their mail servers. The gateway owns the sending IP's reputation and
+delivery path.
 
 ## Local development
 
@@ -26,7 +26,8 @@ npm run dev
 ```
 
 With `GATEWAY_DRY_RUN=true` (the `.env.example` default), the gateway logs the final stamped
-message instead of actually relaying it — safe to run against nothing but your own machine.
+message instead of performing actual MX lookups and delivery — safe to run against nothing but
+your own machine.
 
 In another terminal, with the Signoff app running (`npm run dev` in the repo root) and at least
 one staff member + assigned template in the database:
@@ -35,8 +36,8 @@ one staff member + assigned template in the database:
 FROM=jane.wanjiru@growthpad.co.ke TO=someone@example.com npm run test:send
 ```
 
-Watch the gateway's terminal — you should see the relayed (or dry-run-logged) message with the
-signature appended after `--`. If `FROM` doesn't match a staff row with an assigned template,
+Watch the gateway's terminal — you should see a DRY RUN log showing the message with the
+signature appended. If `FROM` doesn't match a staff row with an assigned template,
 the message passes through unmodified and the gateway logs "no signature — sender not found".
 
 ## Going to production — do this in order, and test at each step
@@ -92,6 +93,67 @@ This handles every piece of outgoing company mail. Don't skip straight to step 4
    signature shows up on all of them, and that replies/threading still look normal.
 6. **Widen the OU scope gradually**, watching gateway logs for errors, before rolling out to
    the whole domain.
+
+## Status: Phase 1 in development (Sep 2026)
+
+Earlier investigation found that relaying mail through Google's SMTP Relay service created an
+architectural loop: Google's Outbound Gateway rule matches the same message twice (original →
+gateway, then gateway's relayed copy back through Google), causing the message to loop endlessly.
+This was unfixable via Admin console configuration.
+
+**Decision: build a real outbound MTA** (Option A) instead of relying on Google's relay. The
+gateway now performs MX lookups and delivers directly to recipient mail servers.
+
+**Current implementation (Phase 1):**
+- ✅ MX record lookups via DNS (`src/mxResolver.ts`)
+- ✅ Direct SMTP delivery to recipient MX servers (`src/mta.ts`)
+- ✅ Tries each MX in priority order, fails if all are unavailable
+- ⏳ **No retry queue yet** — transient failures cause message loss. Phase 2 will add exponential
+  backoff retry queue (5m → 10m → 30m → 1h → 2h → give up after ~5 days).
+- ⏳ **No NDR/bounce handling yet** — failures just log. Phase 2+ will generate and send NDRs
+  back to the original sender when delivery fails permanently.
+
+**Known limitations and next steps:**
+- Warm-up: a brand-new IP has zero reputation with mailbox providers. Real warm-up requires
+  steady, low-volume delivery over **2–4 weeks** — not synthetic test bursts. See "Warm-up
+  protocol" below.
+- The cPanel-hosted domain (`paan.africa`) still can't use Outbound Gateway (lacks the routing
+  feature) — falls back to the manual copy-signature mechanism in the app.
+- Once Phase 1 testing confirms basic delivery works, Phase 2 will add retry queue + NDR
+  handling for production readiness.
+
+## Warm-up protocol (Phase 1 testing)
+
+The outbound IP (`145.241.124.158`) starts with zero reputation. Mailbox providers apply
+stricter standards to unknown IPs, and sending bursts to many recipients is indistinguishable
+from a spam campaign — both will trigger abuse suppression.
+
+**Step 1: Verify basic delivery works**
+1. Deploy Phase 1 code to the OCI instance.
+2. Send **one real test message** to a known-safe recipient (e.g., a personal Gmail account).
+3. Check the recipient's inbox (including spam folder) to confirm arrival.
+4. Check gateway logs for any delivery errors.
+
+**Step 2: Gradual volume increase (2–4 weeks)**
+- **Week 1:** Send 5–10 real messages per day to a small set of known recipients (Gmail, your own
+  other domains, etc.). Monitor inbox arrival and spam folder placement.
+- **Week 2:** Increase to 10–20 per day, gradually expanding recipient domains (but stay within
+  your own org/trusted partners).
+- **Weeks 3–4:** Increase to 50–100+ per day as confidence builds and you see consistent inbox
+  placement. By week 4, full production use should be viable.
+
+**Critical don'ts:**
+- ❌ Don't send bursts (10+ messages in seconds/minutes) to many distinct external recipients.
+- ❌ Don't send large attachments; keep early-stage messages small and text-focused.
+- ❌ Don't send if any messages bounce (fix configuration issues first; bounces are reputation poison).
+- ❌ Don't test multiple times with back-to-back attempts after failures; rest periods matter.
+
+**How to monitor:**
+- Watch gateway logs for delivery errors (`[gateway-mta] delivery failed to ...`).
+- Spot-check recipient inboxes (including spam folders) for actual arrival.
+- Monitor Postmaster Tools dashboards for this domain's reputation (Spam, Delivery Errors tabs).
+- If messages start disappearing (sent but never arrive), **stop sending immediately** and
+  investigate; continued bursts reinforce suppression.
 
 ## Operational status (as of the first real rollout attempt)
 

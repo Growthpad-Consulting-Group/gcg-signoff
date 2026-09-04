@@ -30,13 +30,4 @@ export const config = {
   // The Signoff app's render endpoint (src/app/api/render/route.ts) and its shared secret.
   renderApiUrl: required("RENDER_API_URL"),
   renderApiSecret: required("RENDER_API_SECRET"),
-
-  // Where the gateway hands mail back off for actual delivery, after stamping. Google's own
-  // "SMTP relay service" (smtp-relay.gmail.com) is the recommended target — it accepts mail
-  // from an authorized IP/domain and handles real internet delivery, so this gateway never
-  // needs to be a full outbound MTA (no MX lookups, retries, or bounce handling to build).
-  relayHost: process.env.RELAY_SMTP_HOST ?? "smtp-relay.gmail.com",
-  relayPort: Number(process.env.RELAY_SMTP_PORT ?? 587),
-  relayUser: process.env.RELAY_SMTP_USER,
-  relayPassword: process.env.RELAY_SMTP_PASSWORD,
 };

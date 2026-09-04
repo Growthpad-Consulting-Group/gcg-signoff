@@ -241,7 +241,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
           <img
             src={block.src}
             alt={block.alt}
-            style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%", display: "block" }}
+            style={{ width: block.width, height: block.height || (block.shape === "circle" ? block.width : undefined), objectFit: block.height || block.shape === "circle" ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%", display: "block" }}
             className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
           />
         </div>

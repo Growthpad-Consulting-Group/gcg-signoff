@@ -31,11 +31,12 @@ function serializeBlock(block: Block, templateId?: string): string {
       // Apple Mail, and mobile clients, but not Outlook desktop (its Word-based renderer just
       // stretches/distorts instead of cropping). No workaround for that short of shipping a
       // pre-cropped image; a known, unavoidable email-client gap, not a bug here.
-      const heightStyle = block.height ? `height:${block.height}px;object-fit:cover;` : "";
+      const actualHeight = block.height || (block.shape === "circle" ? block.width : undefined);
+      const heightStyle = actualHeight ? `height:${actualHeight}px;object-fit:cover;` : "";
       // Outlook desktop's Word-based renderer ignores border-radius on <img> same as it ignores
       // object-fit above — Gmail/Apple Mail/mobile clients render it fine. Same accepted gap.
       const radius = imageBorderRadius(block.shape);
-      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${block.height ? `height="${block.height}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border-radius:${radius};border:0;" />`;
+      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${actualHeight ? `height="${actualHeight}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border-radius:${radius};border:0;" />`;
       // Gmail's own signature-settings sanitizer (a different code path than how it renders a
       // *received* message body) is known to strip border-radius off a raw <img> — it survives
       // more reliably on a wrapping element, so a rounded/circle image also gets clipped via an
@@ -43,7 +44,7 @@ function serializeBlock(block: Block, templateId?: string): string {
       const wrappedImg =
         radius === "0"
           ? img
-          : `<span style="display:inline-block;overflow:hidden;border-radius:${radius};width:${block.width}px;${block.height ? `height:${block.height}px;` : ""}line-height:0;">${img}</span>`;
+          : `<span style="display:inline-block;overflow:hidden;border-radius:${radius};width:${block.width}px;${actualHeight ? `height:${actualHeight}px;` : ""}line-height:0;">${img}</span>`;
       const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
       // The anchor needs its own explicit size matching the image — without one, wrapping a
       // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it

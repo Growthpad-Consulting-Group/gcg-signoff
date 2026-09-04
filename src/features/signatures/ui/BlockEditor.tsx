@@ -277,13 +277,14 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
           {block.columns.map((col, idx) => {
             const cs = block.columnStyles[idx] || {};
             const borderColor = cs.borderColor || "#e5e7eb";
+            const borderWidth = cs.borderWidth || 2;
             const realStyle: React.CSSProperties = {
               padding: cs.padding,
               backgroundColor: cs.backgroundColor,
-              borderTop: cs.borderTop ? `2px solid ${borderColor}` : undefined,
-              borderRight: cs.borderRight ? `2px solid ${borderColor}` : undefined,
-              borderBottom: cs.borderBottom ? `2px solid ${borderColor}` : undefined,
-              borderLeft: cs.borderLeft ? `2px solid ${borderColor}` : undefined,
+              borderTop: cs.borderTop ? `${borderWidth}px solid ${borderColor}` : undefined,
+              borderRight: cs.borderRight ? `${borderWidth}px solid ${borderColor}` : undefined,
+              borderBottom: cs.borderBottom ? `${borderWidth}px solid ${borderColor}` : undefined,
+              borderLeft: cs.borderLeft ? `${borderWidth}px solid ${borderColor}` : undefined,
             };
             return (
               // The outer dashed box is just an editing affordance; `realStyle` on the inner div
@@ -1043,6 +1044,9 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                       <div className="grid grid-cols-2 gap-2">
                         <Field label="Border color">
                           <input type="color" value={cs.borderColor || "#e5e7eb"} onChange={(e) => updateColumnStyle({ borderColor: e.target.value })} className="h-8 w-full rounded-lg border border-app-border" />
+                        </Field>
+                        <Field label="Border width (px)">
+                          <input type="number" min="1" value={cs.borderWidth || 2} onChange={(e) => updateColumnStyle({ borderWidth: Number(e.target.value) || 2 })} className={inputClass} />
                         </Field>
                         <Field label="Background">
                           <input type="color" value={cs.backgroundColor || "#ffffff"} onChange={(e) => updateColumnStyle({ backgroundColor: e.target.value })} className="h-8 w-full rounded-lg border border-app-border" />

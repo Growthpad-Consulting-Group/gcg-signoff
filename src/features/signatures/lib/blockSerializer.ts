@@ -87,16 +87,17 @@ function serializeBlock(block: Block, templateId?: string): string {
         .map((col, idx) => {
           const cs = block.columnStyles[idx] || {};
           const borderColor = cs.borderColor || "#e5e7eb";
+          const borderWidth = cs.borderWidth || 2;
           const style = [
             "vertical-align:top",
             `width:${widths[idx]}%`,
             idx < block.columns.length - 1 ? "padding-right:12px" : "",
             cs.padding ? `padding:${cs.padding}px` : "",
             cs.backgroundColor ? `background-color:${cs.backgroundColor}` : "",
-            cs.borderTop ? `border-top:2px solid ${borderColor}` : "",
-            cs.borderRight ? `border-right:2px solid ${borderColor}` : "",
-            cs.borderBottom ? `border-bottom:2px solid ${borderColor}` : "",
-            cs.borderLeft ? `border-left:2px solid ${borderColor}` : "",
+            cs.borderTop ? `border-top:${borderWidth}px solid ${borderColor}` : "",
+            cs.borderRight ? `border-right:${borderWidth}px solid ${borderColor}` : "",
+            cs.borderBottom ? `border-bottom:${borderWidth}px solid ${borderColor}` : "",
+            cs.borderLeft ? `border-left:${borderWidth}px solid ${borderColor}` : "",
           ]
             .filter(Boolean)
             .join(";");

@@ -67,6 +67,7 @@ export interface ColumnStyle {
   borderBottom?: boolean;
   borderLeft?: boolean;
   borderColor?: string;
+  borderWidth?: number; // px width of borders (default 2)
   padding?: number;
   backgroundColor?: string;
   width?: number; // percentage (1–99); unset = equal split

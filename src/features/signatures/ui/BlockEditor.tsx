@@ -225,22 +225,26 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
       // placeholder instead of what would otherwise just look like a broken image.
       if (block.src === "{{photo_url}}") {
         return (
-          <div
-            className={`flex items-center justify-center border border-dashed border-app-border bg-surface-2/60 text-text-lo ${block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}`}
-            style={{ width: block.width, height: block.height || block.width, borderRadius: imageBorderRadius(block.shape) }}
-          >
-            <Icon icon="solar:user-circle-broken" className="h-1/2 w-1/2" />
+          <div style={{ padding: block.padding }}>
+            <div
+              className={`flex items-center justify-center border border-dashed border-app-border bg-surface-2/60 text-text-lo ${block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}`}
+              style={{ width: block.width, height: block.height || block.width, borderRadius: imageBorderRadius(block.shape) }}
+            >
+              <Icon icon="solar:user-circle-broken" className="h-1/2 w-1/2" />
+            </div>
           </div>
         );
       }
       return block.src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={block.src}
-          alt={block.alt}
-          style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%" }}
-          className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
-        />
+        <div style={{ padding: block.padding }}>
+          <img
+            src={block.src}
+            alt={block.alt}
+            style={{ width: block.width, height: block.height, objectFit: block.height ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%", display: "block" }}
+            className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
+          />
+        </div>
       ) : (
         <div className="flex h-16 w-24 items-center justify-center rounded border border-dashed border-app-border text-text-lo">
           <Icon icon="solar:gallery-broken" className="h-5 w-5" />
@@ -898,6 +902,9 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                     <option value="center">Center</option>
                     <option value="right">Right</option>
                   </select>
+                </Field>
+                <Field label="Padding (px)">
+                  <input type="number" min="0" value={selected.padding || 0} onChange={(e) => updateBlock(selected.id, { padding: Number(e.target.value) || undefined })} className={inputClass} />
                 </Field>
                 <Field label="Link URL (tracked)">
                   <input

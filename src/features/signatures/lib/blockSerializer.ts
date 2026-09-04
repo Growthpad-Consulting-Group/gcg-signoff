@@ -52,7 +52,8 @@ function serializeBlock(block: Block, templateId?: string): string {
       const content = href
         ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${wrappedImg}</a>`
         : wrappedImg;
-      return `<tr><td style="${ALIGN_TD(block.align)}">${content}</td></tr>`;
+      const paddingStyle = block.padding ? `padding:${block.padding}px;` : "";
+      return `<tr><td style="${paddingStyle}${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 
     case "button": {

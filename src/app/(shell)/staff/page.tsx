@@ -152,12 +152,16 @@ function StaffFormFields({
   domains,
   templates,
   showDomainField,
+  departments,
+
 }: {
   form: StaffForm;
   setForm: (updater: (f: StaffForm) => StaffForm) => void;
   domains: Domain[];
   templates: Template[];
   showDomainField: boolean;
+  departments: { id: string; name: string }[];
+
 }) {
   const selectedDomain = domains.find((d) => d.id === form.domain_id);
 
@@ -234,11 +238,18 @@ function StaffFormFields({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-hi">Department</label>
-          <input
+          <select
             value={form.department}
             onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
             className="w-full rounded-lg border border-app-border bg-surface px-3 py-2 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          >
+            <option value="">Select a department...</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-hi">Phone</label>
@@ -294,6 +305,8 @@ function StaffPageInner() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -322,14 +335,18 @@ function StaffPageInner() {
 
   const load = async () => {
     setLoading(true);
-    const [staffRes, domainsRes, templatesRes] = await Promise.all([
+    const [staffRes, domainsRes, templatesRes, departmentsRes] = await Promise.all([
       fetch("/api/staff").then((r) => r.json()),
       fetch("/api/domains").then((r) => r.json()),
       fetch("/api/templates").then((r) => r.json()),
+      fetch("/api/departments").then((r) => r.json()),
+
     ]);
     setStaff(staffRes.staff || []);
     setDomains(domainsRes.domains || []);
     setTemplates(templatesRes.templates || []);
+    setDepartments(departmentsRes.departments || []);
+
     setLoading(false);
   };
 
@@ -836,7 +853,7 @@ function StaffPageInner() {
 
       <SimpleModal isOpen={showAdd} onClose={() => setShowAdd(false)} title="Add staff member" width="max-w-lg">
         <div className="space-y-4">
-          <StaffFormFields form={form} setForm={setForm} domains={domains} templates={templates} showDomainField />
+          <StaffFormFields form={form} setForm={setForm} domains={domains} templates={templates} departments={departments} showDomainField />
           <Button className="w-full" onClick={addStaff} disabled={!canSubmit || adding}>
             <Icon icon="solar:user-plus-broken" className="h-4 w-4" />
             {adding ? "Adding…" : "Add staff member"}
@@ -860,6 +877,8 @@ function StaffPageInner() {
               setForm={(updater) => setEditForm((f) => (f ? updater(f) : f))}
               domains={domains}
               templates={templates}
+              departments={departments}
+
               showDomainField={false}
             />
             <Button className="w-full" onClick={saveEdit} disabled={savingEdit}>

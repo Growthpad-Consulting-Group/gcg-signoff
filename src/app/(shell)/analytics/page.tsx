@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
 
     fetch("/api/templates/analytics")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("request failed"))))
-      .then(setLinkData)
+      .then((body) => setLinkData({ total: body.total ?? 0, byTemplate: body.byTemplate ?? [], recent: body.recent ?? [] }))
       .catch(() => setLinkData({ total: 0, byTemplate: [], recent: [] }));
   }, []);
 

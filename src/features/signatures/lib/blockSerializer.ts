@@ -9,6 +9,17 @@ const SOCIAL_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/social
 
 const ALIGN_TD = (align: "left" | "center" | "right") => (align === "left" ? "" : `text-align:${align};`);
 
+/** If `html` is a single merge tag and nothing else (ignoring surrounding tags/whitespace, e.g.
+ * `createContactRow`'s `<p>{{mobile}}</p>`), returns that tag's name — otherwise null. Used to
+ * mark a "columns" row built around exactly one per-staff field, so renderSignatureHtml can drop
+ * the whole row (icon + spacer included) for staff it doesn't apply to, instead of shipping empty
+ * icon/table markup to everyone just because one field was left blank. */
+function soleMergeTag(html: string): string | null {
+  const stripped = html.replace(/<[^>]*>/g, "").trim();
+  const m = /^\{\{\s*([a-z_]+)\s*\}\}$/i.exec(stripped);
+  return m ? m[1].toLowerCase() : null;
+}
+
 /** Wraps `inner` in a tracked-click href, if `templateId` + `linkUrl` are both present and valid. Falls back to a plain (untracked) link, then to no link at all. */
 function trackedOrPlainHref(templateId: string | undefined, linkUrl: string | undefined, linkLabel: string | undefined): string | null {
   if (!linkUrl?.trim()) return null;
@@ -106,7 +117,15 @@ function serializeBlock(block: Block, templateId?: string): string {
           return `<td style="${style};"><table cellpadding="0" cellspacing="0" border="0" width="100%">${col.map((b) => serializeBlock(b, templateId)).join("")}</table></td>`;
         })
         .join("");
-      return `<tr><td><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${tds}</tr></table></td></tr>`;
+      // A row built around exactly one per-staff field (e.g. createContactRow's icon+{{mobile}}
+      // pair) gets tagged so renderSignatureHtml can drop the entire row for staff that field is
+      // blank for, rather than paying for the icon/table markup on every signature regardless.
+      const soleTags = block.columns
+        .flatMap((col) => col.filter((b): b is Extract<Block, { type: "text" }> => b.type === "text"))
+        .map((b) => soleMergeTag(b.html))
+        .filter((t): t is string => !!t);
+      const marker = soleTags.length === 1 ? ` data-mt-row="${soleTags[0]}"` : "";
+      return `<tr${marker}><td><table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>${tds}</tr></table></td></tr>`;
     }
 
     case "html":

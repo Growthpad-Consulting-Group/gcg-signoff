@@ -45,6 +45,10 @@ function getGmailClientFor(staffEmail: string) {
   return google.gmail({ version: "v1", auth });
 }
 
+// Gmail's own hard cap on sendAs.signature — checked up front so a too-long signature fails with
+// a message that says what to actually do about it, instead of surfacing Gmail's raw API error.
+const GMAIL_SIGNATURE_MAX_LENGTH = 10000;
+
 export interface GmailSyncResult {
   ok: boolean;
   error?: string;
@@ -52,6 +56,12 @@ export interface GmailSyncResult {
 
 /** Pushes `html` as the given staff email's Gmail "sendAs" signature. */
 export async function pushSignatureToGmail(staffEmail: string, html: string): Promise<GmailSyncResult> {
+  if (html.length > GMAIL_SIGNATURE_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `Signature is ${html.length} characters, over Gmail's ${GMAIL_SIGNATURE_MAX_LENGTH}-character limit. Trim the template in the signature editor (fewer blocks, shorter text, or a lighter image row) and try again.`,
+    };
+  }
   try {
     const gmail = getGmailClientFor(staffEmail);
     await gmail.users.settings.sendAs.patch({

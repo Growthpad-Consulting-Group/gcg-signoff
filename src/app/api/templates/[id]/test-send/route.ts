@@ -10,7 +10,7 @@ const SAMPLE_STAFF = {
   role_title: "Marketing Manager",
   department: "Marketing",
   phone: "+254 700 000 000",
-  mobile: "+254 711 000 000",
+  mobile: "",
   photo_url: "https://placehold.co/72x72/f05d23/ffffff?text=JW",
 };
 

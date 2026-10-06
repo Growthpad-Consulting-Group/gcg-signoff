@@ -183,6 +183,14 @@ function createContactDetailsBlocks(): Block[] {
 const PRESETS: { id: string; label: string; icon: string; build: () => Block[] }[] = [
   { id: "staffCard", label: "Staff card (photo + name/role)", icon: "solar:user-id-broken", build: () => [createStaffCardBlock()] },
   { id: "contactDetails", label: "Contact details (icons)", icon: "solar:phone-broken", build: createContactDetailsBlocks },
+  // Single rows, for adding one contact field (with its icon) to a template that doesn't want
+  // the full 4-row contactDetails preset — e.g. a template that already has phone/address/
+  // website and just needs mobile added, without rebuilding the whole block as plain text (which
+  // is how templates predating this preset ended up with an icon-less number row).
+  { id: "phoneRow", label: "Phone (icon)", icon: "solar:phone-calling-broken", build: () => [createContactRow("phone", "{{phone}}")] },
+  { id: "mobileRow", label: "Mobile (icon)", icon: "solar:smartphone-broken", build: () => [createContactRow("mobile", "{{mobile}}")] },
+  { id: "locationRow", label: "Address (icon)", icon: "solar:map-point-broken", build: () => [createContactRow("location", "Your office address")] },
+  { id: "websiteRow", label: "Website (icon)", icon: "solar:global-broken", build: () => [createContactRow("website", "www.example.com")] },
 ];
 
 const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];

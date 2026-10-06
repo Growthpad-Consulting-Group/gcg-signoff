@@ -284,7 +284,18 @@ export default function RichTextEditor({
       StarterKit.configure({ heading: false, paragraph: false }), // email signatures have no use for h1-h6 sizing; StyledParagraph below replaces the default
       StyledParagraph,
       Underline,
-      Link.configure({ openOnClick: false, autolink: false }),
+      Link.configure({
+        openOnClick: false,
+        autolink: false,
+        // Tiptap's Link mark defaults to only http(s) and runs every href through its own URL
+        // validator — a `tel:{{phone}}` href (built by createContactRow/telLink in
+        // BlockEditor.tsx so each staff member's own number becomes the link target) fails both
+        // checks on the very first parse, silently dropping the mark and leaving plain text.
+        // `tel`/`mailto` cover real contact links; the regex exception lets an unresolved merge
+        // tag through, since `{{phone}}` isn't a syntactically valid URL for isAllowedUri to pass.
+        protocols: ["http", "https", "mailto", "tel"],
+        validate: (href) => /^(https?:|mailto:|tel:)/i.test(href) || /\{\{\s*[a-z_]+\s*\}\}/i.test(href),
+      }),
       TextAlign.configure({ types: ["paragraph"] }),
       TextStyle,
       Color,

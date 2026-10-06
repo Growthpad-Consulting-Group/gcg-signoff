@@ -5,6 +5,17 @@ import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import SimpleModal from "@/shared/ui/SimpleModal";
 import { createBrowserSupabaseClient } from "@/shared/lib/supabase/client";
+import { PRODUCTION_APP_URL } from "@/features/signatures/lib/trackedLink";
+
+// The same built-in icon sets blockSerializer.ts/BlockEditor.tsx reach for (contact rows, social
+// rows) — shown here so swapping an existing icon block's image doesn't require re-adding the
+// whole preset row just to pick a different one of these.
+const CONTACT_ICONS = ["phone", "mobile", "location", "website"];
+const SOCIAL_ICONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
+// PRODUCTION_APP_URL (not NEXT_PUBLIC_APP_URL) for the same reason CONTACT_ICON/SOCIAL_ICON use
+// it elsewhere — this URL gets baked into the stored block the moment an icon is picked.
+const contactIconUrl = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/contact/${icon}.png`;
+const socialIconUrl = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/social/${icon}.png`;
 
 const BUCKET = "signature-assets";
 // Not a hard platform limit (Supabase Storage's own project cap is higher) — just a sane ceiling
@@ -27,7 +38,7 @@ export default function MediaPicker({
   onClose: () => void;
   onSelect: (url: string) => void;
 }) {
-  const [tab, setTab] = useState<"library" | "upload">("library");
+  const [tab, setTab] = useState<"library" | "upload" | "icons">("library");
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -112,6 +123,14 @@ export default function MediaPicker({
         >
           Upload new
         </button>
+        <button
+          onClick={() => setTab("icons")}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            tab === "icons" ? "bg-brand-500 text-white" : "text-text-lo hover:text-text-hi"
+          }`}
+        >
+          Icons
+        </button>
       </div>
 
       {tab === "library" && (
@@ -138,6 +157,45 @@ export default function MediaPicker({
             </div>
           )}
         </>
+      )}
+
+      {tab === "icons" && (
+        <div className="max-h-96 space-y-4 overflow-y-auto">
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Contact</p>
+            <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
+              {CONTACT_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  onClick={() => select(contactIconUrl(icon))}
+                  className="group flex flex-col items-center gap-1 rounded-lg border border-app-border p-2 transition-colors hover:border-brand-500"
+                  title={icon}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- built-in icon, not a next/image-allowlisted upload */}
+                  <img src={contactIconUrl(icon)} alt={icon} className="h-8 w-8" />
+                  <span className="truncate text-xs text-text-lo group-hover:text-text-hi">{icon}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Social</p>
+            <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
+              {SOCIAL_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  onClick={() => select(socialIconUrl(icon))}
+                  className="group flex flex-col items-center gap-1 rounded-lg border border-app-border p-2 transition-colors hover:border-brand-500"
+                  title={icon}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- built-in icon, not a next/image-allowlisted upload */}
+                  <img src={socialIconUrl(icon)} alt={icon} className="h-8 w-8" />
+                  <span className="truncate text-xs text-text-lo group-hover:text-text-hi">{icon}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {tab === "upload" && (

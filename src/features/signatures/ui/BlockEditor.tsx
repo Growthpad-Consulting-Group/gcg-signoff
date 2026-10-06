@@ -142,6 +142,15 @@ function createStaffCardBlock(): Block {
 // image), the same reason the pre-existing social icons are PNG too.
 const CONTACT_ICON = (icon: string) => `${PRODUCTION_APP_URL}/assets/icons/contact/${icon}.png`;
 
+/** `{{phone}}`/`{{mobile}}` wrapped in a `tel:` link — the merge tag appears twice (href and
+ * label) so each staff member's own number ends up as both the link target and the visible text
+ * once renderSignatureHtml substitutes it; a plain `{{phone}}` alone rendered as inert text in
+ * Gmail (no href at all), which is the "plain text, not clickable" problem this fixes. No
+ * click-tracking redirect here (unlike the Link URL field on an image/button block) — those are
+ * baked in at template-authoring time with a fixed destination, but a `tel:` target has to vary
+ * per staff, which only a merge tag inside the href itself can do. */
+const telLink = (tag: "phone" | "mobile") => `<a href="tel:{{${tag}}}">{{${tag}}}</a>`;
+
 /** One icon-in-a-circle + text row (phone/mobile/address/website) — a `columns` block just like
  * the staff card, so it stays fully editable (swap the icon, edit the text, resize the columns)
  * rather than being a one-off special case. */
@@ -167,9 +176,9 @@ function createContactRow(icon: string, text: string): Block {
  * they land as plain editable placeholder text instead. */
 function createContactDetailsBlocks(): Block[] {
   return [
-    createContactRow("phone", "{{phone}}"),
+    createContactRow("phone", telLink("phone")),
     { id: newBlockId(), type: "spacer", height: 8 },
-    createContactRow("mobile", "{{mobile}}"),
+    createContactRow("mobile", telLink("mobile")),
     { id: newBlockId(), type: "spacer", height: 8 },
     createContactRow("location", "Your office address"),
     { id: newBlockId(), type: "spacer", height: 8 },
@@ -187,8 +196,8 @@ const PRESETS: { id: string; label: string; icon: string; build: () => Block[] }
   // the full 4-row contactDetails preset — e.g. a template that already has phone/address/
   // website and just needs mobile added, without rebuilding the whole block as plain text (which
   // is how templates predating this preset ended up with an icon-less number row).
-  { id: "phoneRow", label: "Phone (icon)", icon: "solar:phone-calling-broken", build: () => [createContactRow("phone", "{{phone}}")] },
-  { id: "mobileRow", label: "Mobile (icon)", icon: "solar:smartphone-broken", build: () => [createContactRow("mobile", "{{mobile}}")] },
+  { id: "phoneRow", label: "Phone (icon)", icon: "solar:phone-calling-broken", build: () => [createContactRow("phone", telLink("phone"))] },
+  { id: "mobileRow", label: "Mobile (icon)", icon: "solar:smartphone-broken", build: () => [createContactRow("mobile", telLink("mobile"))] },
   { id: "locationRow", label: "Address (icon)", icon: "solar:map-point-broken", build: () => [createContactRow("location", "Your office address")] },
   { id: "websiteRow", label: "Website (icon)", icon: "solar:global-broken", build: () => [createContactRow("website", "www.example.com")] },
 ];
@@ -351,8 +360,12 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
       {...(wholeBodyDraggable ? listeners : {})}
       // Notion-style chrome: no permanent box, just a hover-revealed drag handle/delete and a
       // left accent bar on selection — a permanent bordered card per block is what reads as
-      // "basic" as much as anything about the text editor itself.
-      className={`group relative flex items-start gap-1 rounded-md py-1 pr-1 transition-colors ${wholeBodyDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
+      // "basic" as much as anything about the text editor itself. The handle/actions are
+      // absolutely positioned overlays (not flex siblings of the content) so a narrow nested
+      // column — e.g. a contact row's 14%-wide icon column — doesn't have its actual preview
+      // content squeezed down to make room for them; they float over the small reserved padding
+      // on each side instead of competing with the content for width.
+      className={`group relative rounded-md py-1 pl-6 pr-8 transition-colors ${wholeBodyDraggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"} ${
         selected ? "bg-brand-500/5" : "hover:bg-surface-2/60"
       }`}
     >
@@ -361,14 +374,14 @@ function SortableBlock({ block, actions }: { block: Block; actions: ListActions 
         {...listeners}
         onClick={(e) => e.stopPropagation()}
         title="Drag to move"
-        className="mt-1 shrink-0 cursor-grab rounded p-1 text-text-lo opacity-0 transition hover:bg-surface-2 hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
+        className="absolute left-0 top-1 cursor-grab rounded p-1 text-text-lo opacity-0 transition hover:bg-surface-2 hover:text-text-hi active:cursor-grabbing group-hover:opacity-100"
       >
         <Icon icon="solar:hamburger-menu-broken" className="h-4 w-4" />
       </button>
-      <div className={`min-w-0 flex-1 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
+      <div className={`min-w-0 border-l-2 pl-3 ${selected ? "border-brand-500" : "border-transparent"}`}>
         <BlockPreview block={block} editingText={selected} actions={actions} />
       </div>
-      <div className="mt-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-0 top-1 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -499,6 +512,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const [blocks, setBlocks] = useState<Block[]>(() => (initialBlocks && initialBlocks.length > 0 ? initialBlocks : wrapLegacyHtml(initialHtml)));
   const [canvasWidth, setCanvasWidth] = useState<number>(initialCanvasWidth || DEFAULT_CANVAS_WIDTH);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
   // Label shown in the DragOverlay while dragging a *new* block in from the palette — sortable
   // items already get their own transform-based preview from useSortable, so this only needs to
@@ -775,23 +789,44 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex h-full min-h-0">
-      {/* Palette */}
-      <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-lo">Add block</p>
-        <p className="mb-2 text-xs text-text-lo">Click to add, or drag onto the canvas — even directly into a column.</p>
-        <div className="space-y-2">
-          {PALETTE.map((p) => (
-            <PaletteButton key={p.type} type={p.type} label={p.label} icon={p.icon} onClick={() => addBlock(p.type)} />
-          ))}
+      {/* Palette — collapsible so the canvas can go full-width while editing, not just viewing. */}
+      {paletteCollapsed ? (
+        <div className="shrink-0 border-r border-app-border bg-surface p-2">
+          <button
+            onClick={() => setPaletteCollapsed(false)}
+            title="Show block panel"
+            className="rounded-lg p-2 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+          >
+            <Icon icon="solar:sidebar-minimalistic-broken" className="h-4 w-4" />
+          </button>
         </div>
+      ) : (
+        <div className="w-56 shrink-0 overflow-y-auto border-r border-app-border bg-surface p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-wide text-text-lo">Add block</p>
+            <button
+              onClick={() => setPaletteCollapsed(true)}
+              title="Hide block panel"
+              className="rounded p-1 text-text-lo transition-colors hover:bg-surface-2 hover:text-text-hi"
+            >
+              <Icon icon="solar:sidebar-minimalistic-broken" className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="mb-2 text-xs text-text-lo">Click to add, or drag onto the canvas — even directly into a column.</p>
+          <div className="space-y-2">
+            {PALETTE.map((p) => (
+              <PaletteButton key={p.type} type={p.type} label={p.label} icon={p.icon} onClick={() => addBlock(p.type)} />
+            ))}
+          </div>
 
-        <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-text-lo">Presets</p>
-        <div className="space-y-2">
-          {PRESETS.map((p) => (
-            <PresetButton key={p.id} id={p.id} label={p.label} icon={p.icon} onClick={() => addPresetBlocks(p.build())} />
-          ))}
+          <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-text-lo">Presets</p>
+          <div className="space-y-2">
+            {PRESETS.map((p) => (
+              <PresetButton key={p.id} id={p.id} label={p.label} icon={p.icon} onClick={() => addPresetBlocks(p.build())} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Canvas. Editing width stays comfortable to work in regardless of canvasWidth — cramping
           the whole workspace down to a 600px signature width made dragging/clicking blocks
@@ -800,7 +835,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
           visually too. A dashed guide marks where the real signature width ends instead, so it's
           still visible without constraining the work area. */}
       <div className="flex-1 overflow-y-auto bg-surface-2/40 p-10">
-        <div className="mx-auto w-full" style={{ maxWidth: Math.max(canvasWidth, 900) }}>
+        <div className="mx-auto w-full" style={{ maxWidth: Math.max(canvasWidth, paletteCollapsed ? 1400 : 900) }}>
           <div className="relative rounded-lg bg-surface p-6 shadow-sm">
             {canvasWidth < 700 && (
               <div

@@ -18,6 +18,7 @@ export interface ImageBlock {
   id: string;
   type: "image";
   src: string;
+  darkSrc?: string; // alternate image shown in dark mode (Apple Mail, iOS Mail, Outlook.com — not Gmail)
   alt: string;
   width: number; // px
   height?: number; // px — unset means auto (preserve source aspect ratio)

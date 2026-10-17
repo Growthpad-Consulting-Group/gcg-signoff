@@ -95,6 +95,9 @@ interface BlockEditorProps {
   // Delete/Preview/Save) rather than as an isolated, easy-to-miss pair of icons floating above
   // the canvas with nothing else around them for context.
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  // When true the canvas swaps in darkSrc for any image block that has one, matching the dark
+  // preview toggle in the outer page.
+  previewDark?: boolean;
 }
 
 const PALETTE: { type: Block["type"]; label: string; icon: string }[] = [
@@ -207,6 +210,7 @@ const SOCIAL_OPTIONS = ["linkedin", "instagram", "facebook", "x", "youtube"];
 interface ListActions {
   selectedId: string | null;
   templateId: string;
+  previewDark?: boolean;
   onSelect: (id: string) => void;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -256,7 +260,7 @@ function BlockPreview({ block, editingText, actions }: { block: Block; editingTe
         // eslint-disable-next-line @next/next/no-img-element
         <div style={{ paddingTop: block.paddingY, paddingBottom: block.paddingY, paddingLeft: block.paddingX, paddingRight: block.paddingX }}>
           <img
-            src={block.src}
+            src={(actions.previewDark && block.darkSrc) ? block.darkSrc : block.src}
             alt={block.alt}
             style={{ width: block.width, height: block.height || (block.shape === "circle" ? block.width : undefined), objectFit: block.height || block.shape === "circle" ? "cover" : undefined, borderRadius: imageBorderRadius(block.shape), maxWidth: "100%", display: "block" }}
             className={block.align === "center" ? "mx-auto" : block.align === "right" ? "ml-auto" : ""}
@@ -506,7 +510,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = "w-full rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-sm text-text-hi outline-none focus:ring-2 focus:ring-brand-500";
 
 const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function BlockEditor(
-  { templateId, initialBlocks, initialHtml, initialCanvasWidth, onChange, onHistoryChange },
+  { templateId, initialBlocks, initialHtml, initialCanvasWidth, onChange, onHistoryChange, previewDark },
   ref
 ) {
   const [blocks, setBlocks] = useState<Block[]>(() => (initialBlocks && initialBlocks.length > 0 ? initialBlocks : wrapLegacyHtml(initialHtml)));
@@ -514,6 +518,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [pickerOpenFor, setPickerOpenFor] = useState<string | null>(null);
+  const [darkPickerOpenFor, setDarkPickerOpenFor] = useState<string | null>(null);
   // Label shown in the DragOverlay while dragging a *new* block in from the palette — sortable
   // items already get their own transform-based preview from useSortable, so this only needs to
   // cover the palette case (which isn't part of any SortableContext).
@@ -682,6 +687,7 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
   const actions: ListActions = {
     selectedId,
     templateId,
+    previewDark,
     onSelect: setSelectedId,
     onRemove: removeBlock,
     onDuplicate: duplicateBlock,
@@ -912,6 +918,28 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
                     </div>
                   </div>
                   <p className="mt-1.5 text-xs text-text-lo">A static image is the same for everyone; each staff member's photo shows their own picture once the signature is sent.</p>
+                </Field>
+                <Field label="Dark mode image">
+                  <div className="flex items-center gap-2">
+                    {selected.darkSrc && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={selected.darkSrc} alt="" className="h-10 w-10 rounded border border-app-border object-cover" />
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <button onClick={() => setDarkPickerOpenFor(selected.id)} className="rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi hover:bg-surface-2">
+                        {selected.darkSrc ? "Change dark image" : "Choose dark image"}
+                      </button>
+                      {selected.darkSrc && (
+                        <button onClick={() => updateBlock(selected.id, { darkSrc: undefined })} className="rounded-lg border border-app-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-hi hover:bg-surface-2">
+                          Remove dark image
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="mt-1.5 text-xs text-text-lo">
+                    Shown instead of the main image in dark mode. Works in Apple Mail, iOS Mail, Outlook.com, and Yahoo Mail.{" "}
+                    <span className="font-medium">Gmail ignores this</span> — it always shows the main image.
+                  </p>
                 </Field>
                 <Field label="Alt text">
                   <input value={selected.alt} onChange={(e) => updateBlock(selected.id, { alt: e.target.value })} className={inputClass} />
@@ -1147,6 +1175,14 @@ const BlockEditor = forwardRef<BlockEditorHandle, BlockEditorProps>(function Blo
         onSelect={(url) => {
           if (pickerOpenFor) updateBlock(pickerOpenFor, { src: url });
           setPickerOpenFor(null);
+        }}
+      />
+      <MediaPicker
+        isOpen={!!darkPickerOpenFor}
+        onClose={() => setDarkPickerOpenFor(null)}
+        onSelect={(url) => {
+          if (darkPickerOpenFor) updateBlock(darkPickerOpenFor, { darkSrc: url });
+          setDarkPickerOpenFor(null);
         }}
       />
 

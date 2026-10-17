@@ -298,6 +298,7 @@ export default function TemplateEditorPage() {
             setPreviewHtml(html);
             scheduleAutosave();
           }}
+          previewDark={previewDark}
           onHistoryChange={(undoAvailable, redoAvailable) => {
             setCanUndo(undoAvailable);
             setCanRedo(redoAvailable);
@@ -363,7 +364,16 @@ export default function TemplateEditorPage() {
           </div>
 
           <div className={`mx-auto w-full flex-1 overflow-auto rounded-lg border border-app-border p-4 transition-all ${previewDark ? "bg-gray-900" : "bg-white"} ${previewMobile ? "max-w-[375px]" : ""}`} style={{ minHeight: 300 }}>
-            <div className={previewDark ? "text-white" : "text-black"} dangerouslySetInnerHTML={{ __html: renderSignatureHtml(previewHtml, previewData) }} />
+            <div
+              className={previewDark ? "text-white" : "text-black"}
+              dangerouslySetInnerHTML={{
+                __html:
+                  renderSignatureHtml(previewHtml, previewData) +
+                  (previewDark
+                    ? "<style>.img-light{display:none!important;}.img-dark{display:block!important;}</style>"
+                    : "<style>.img-light{display:block!important;}.img-dark{display:none!important;}</style>"),
+              }}
+            />
           </div>
           <p className="mb-2 mt-1 text-xs text-text-lo">
             {previewAsId ? "Rendered with this staff member's real details." : "Rendered with sample data."}

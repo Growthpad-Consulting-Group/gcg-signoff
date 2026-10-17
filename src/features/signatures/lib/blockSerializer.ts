@@ -47,24 +47,47 @@ function serializeBlock(block: Block, templateId?: string): string {
       // Outlook desktop's Word-based renderer ignores border-radius on <img> same as it ignores
       // object-fit above — Gmail/Apple Mail/mobile clients render it fine. Same accepted gap.
       const radius = imageBorderRadius(block.shape);
-      const img = `<img src="${block.src}" alt="${block.alt}" width="${block.width}" ${actualHeight ? `height="${actualHeight}"` : ""} style="display:block;width:${block.width}px;max-width:100%;${heightStyle}border-radius:${radius};border:0;" />`;
+      const sizeAttrs = `width="${block.width}" ${actualHeight ? `height="${actualHeight}"` : ""}`;
+      const sizeStyle = `display:block;width:${block.width}px;max-width:100%;${heightStyle}border-radius:${radius};border:0;`;
+
+      const wrapRadius = (imgTag: string) =>
+        radius === "0"
+          ? imgTag
+          : `<span style="display:inline-block;overflow:hidden;border-radius:${radius};width:${block.width}px;${actualHeight ? `height:${actualHeight}px;` : ""}line-height:0;">${imgTag}</span>`;
+
+      const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
+      const anchorStyle = `display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}`;
+
+      const paddingStyle = block.paddingY || block.paddingX ? `padding:${block.paddingY || 0}px ${block.paddingX || 0}px;` : "";
+
+      if (block.darkSrc) {
+        // Dark-mode image swap: show darkSrc in dark mode, src in light mode.
+        // Works in Apple Mail, iOS Mail, Outlook.com, Yahoo Mail. Gmail ignores @media entirely
+        // and falls back to the light image — no workaround exists for Gmail.
+        const lightImg = `<img src="${block.src}" alt="${block.alt}" ${sizeAttrs} class="img-light" style="${sizeStyle}" />`;
+        const darkImg = `<img src="${block.darkSrc}" alt="${block.alt}" ${sizeAttrs} class="img-dark" style="${sizeStyle}display:none;" />`;
+        // Gmail's sanitizer strips border-radius off a raw <img>; wrap for rounded/circle shapes.
+        const lightWrapped = wrapRadius(lightImg);
+        const darkWrapped = wrapRadius(darkImg);
+        const lightContent = href ? `<a href="${href}" style="${anchorStyle}">${lightWrapped}</a>` : lightWrapped;
+        const darkContent = href ? `<a href="${href}" style="${anchorStyle}">${darkWrapped}</a>` : darkWrapped;
+        // The <style> block must be inline (not in <head>) because most email clients strip <head>.
+        // Gmail ignores <style> in the body too, so this gracefully degrades to the light image.
+        const styleTag = `<style>.img-dark{display:none!important;}@media(prefers-color-scheme:dark){.img-light{display:none!important;}.img-dark{display:block!important;}}</style>`;
+        return `<tr><td style="${paddingStyle}${ALIGN_TD(block.align)}">${styleTag}${lightContent}${darkContent}</td></tr>`;
+      }
+
+      const img = `<img src="${block.src}" alt="${block.alt}" ${sizeAttrs} style="${sizeStyle}" />`;
       // Gmail's own signature-settings sanitizer (a different code path than how it renders a
       // *received* message body) is known to strip border-radius off a raw <img> — it survives
       // more reliably on a wrapping element, so a rounded/circle image also gets clipped via an
       // overflow:hidden span with the same radius, not just the <img>'s own style.
-      const wrappedImg =
-        radius === "0"
-          ? img
-          : `<span style="display:inline-block;overflow:hidden;border-radius:${radius};width:${block.width}px;${actualHeight ? `height:${actualHeight}px;` : ""}line-height:0;">${img}</span>`;
-      const href = trackedOrPlainHref(templateId, block.linkUrl, block.linkLabel);
+      const wrappedImg = wrapRadius(img);
       // The anchor needs its own explicit size matching the image — without one, wrapping a
       // block-level <img> in a bare <a> makes most mail clients block-ify the anchor too, and it
       // then stretches to fill the <td> (which itself expands to the table's width:100%), so the
       // clickable area extends well past the visible image into any empty space beside it.
-      const content = href
-        ? `<a href="${href}" style="display:block;width:${block.width}px;max-width:100%;${block.height ? `height:${block.height}px;` : ""}">${wrappedImg}</a>`
-        : wrappedImg;
-      const paddingStyle = block.paddingY || block.paddingX ? `padding:${block.paddingY || 0}px ${block.paddingX || 0}px;` : "";
+      const content = href ? `<a href="${href}" style="${anchorStyle}">${wrappedImg}</a>` : wrappedImg;
       return `<tr><td style="${paddingStyle}${ALIGN_TD(block.align)}">${content}</td></tr>`;
     }
 
